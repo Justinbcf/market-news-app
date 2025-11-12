@@ -110,8 +110,24 @@
       .key{min-width:100%;width:100%}
       .toolbar{flex-direction:column;align-items:stretch;gap:8px}
       .toolbar label{margin-bottom:4px}
-      .trend-grid,.trend-row{grid-template-columns:50px 70px 1fr 70px 50px;font-size:11px}
-      .trend-actions button{padding:4px 8px;font-size:11px}
+      
+      /* Better mobile Reddit table */
+      .trend-grid{display:none} /* Hide desktop header */
+      .trend-row{display:flex;flex-direction:column;padding:12px;gap:8px}
+      .trend-row > div{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--pill)}
+      .trend-row > div:last-child{border-bottom:none}
+      .trend-row > div:before{content:attr(data-label);font-weight:600;color:var(--muted);font-size:11px}
+      .trend-actions{margin-top:8px;border-bottom:none !important}
+      .trend-actions button{width:100%;padding:8px}
+      
+      /* Mobile trending header */
+      .mobile-trend-header{display:block;font-weight:700;color:#a5b4fc;padding:8px 0;margin-bottom:8px;border-bottom:2px solid var(--border)}
+      
+      /* Hide mobile header on desktop */
+      @media (min-width: 769px) {
+        .mobile-trend-header{display:none}
+      }
+      
       .login-modal{margin:20px;padding:24px}
       .login-title{font-size:20px}
       .user-info{flex-direction:column;align-items:flex-start;gap:8px}
@@ -122,7 +138,12 @@
       .wrap{margin:12px auto;padding:0 8px}
       h1{font-size:18px}
       .card{padding:8px;border-radius:8px}
-      .trend-grid,.trend-row{grid-template-columns:40px 60px 1fr 60px 40px;font-size:10px}
+      
+      /* Compact mobile Reddit table */
+      .trend-row{padding:8px;font-size:12px}
+      .trend-row > div{font-size:11px}
+      .trend-actions button{font-size:11px;padding:6px}
+      
       .login-modal{margin:12px;padding:16px}
       .login-actions{flex-direction:column}
       .login-actions button{margin-bottom:8px}
@@ -788,6 +809,7 @@
           break;
       }
 
+      // Desktop header (hidden on mobile)
       host.append(el('div',{className:'trend-grid trend-header'},
         el('div',{},'#'),
         el('div',{},'Ticker'),
@@ -796,14 +818,17 @@
         el('div',{},'Upvotes'),
         el('div',{},'Action')
       ));
+      
+      // Mobile header (hidden on desktop)
+      host.append(el('div',{className:'mobile-trend-header'}, '📈 Trending Tickers'));
 
       sortedRows.forEach(r=>{
         const row = el('div',{className:'trend-row'},
-          el('div',{}, String(r.rank ?? '')),
-          el('div',{}, String(r.ticker ?? '')),
-          el('div',{}, String(r.name ?? '')),
-          el('div',{}, String(r.mentions ?? '')),
-          el('div',{}, String(r.upvotes ?? '')),
+          el('div',{'data-label':'Rank:'}, String(r.rank ?? '')),
+          el('div',{'data-label':'Ticker:'}, String(r.ticker ?? '')),
+          el('div',{'data-label':'Name:'}, String(r.name ?? '')),
+          el('div',{'data-label':'Mentions:'}, String(r.mentions ?? '')),
+          el('div',{'data-label':'Upvotes:'}, String(r.upvotes ?? '')),
           el('div',{className:'trend-actions'},
             el('button',{className:'ghost',onclick:()=>{ $('#ticker').value = (r.ticker||'').toUpperCase(); startSearch(); }},'Open News')
           )
