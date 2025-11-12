@@ -1,0 +1,909 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Super Fancy Market News Tool</title>
+  <meta name="description" content="Finnhub company-news scanner with sentiment/topic chips, article summarization, and Reddit trending tickers via Worker." />
+  
+  <!-- PWA Meta Tags -->
+  <meta name="theme-color" content="#0b1020" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Market News" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  
+  <!-- Apple Touch Icons -->
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%230b1020' width='180' height='180'/><text x='90' y='110' font-family='Arial' font-size='100' fill='%2322d3ee' text-anchor='middle'>📈</text></svg>" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%230b1020' width='180' height='180'/><text x='90' y='110' font-family='Arial' font-size='100' fill='%2322d3ee' text-anchor='middle'>📈</text></svg>" />
+  
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(registration => {
+            console.log('SW registered: ', registration);
+          })
+          .catch(registrationError => {
+            console.log('SW registration failed: ', registrationError);
+          });
+      });
+    }
+  </script>
+  <style>
+    :root{ --bg:#0b1020; --panel:#0f172a; --panel-2:#10192f; --text:#e5e7eb; --muted:#94a3b8; --border:#1f2a44; --accent:#22d3ee; --accent-2:#1fb6ff; --ok:#10b981; --warn:#f59e0b; --err:#ef4444; --pill:#233045; --shadow:0 6px 18px rgba(0,0,0,.35) }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    a{color:var(--accent)}
+    .wrap{max-width:1000px;margin:36px auto;padding:0 18px}
+    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+    h1{font-size:26px;margin:0}
+    .sub{color:var(--muted)}
+    .card{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:var(--shadow);margin-bottom:14px}
+    .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+    label{font-weight:600}
+    input[type=text],input[type=password],select{background:#0b1220;color:var(--text);border:1px solid var(--pill);border-radius:10px;padding:10px 12px;outline:none}
+    input[type=text]{flex:1 1 340px}
+    .key{min-width:320px}
+    button{background:linear-gradient(135deg,var(--accent-2),var(--accent));border:none;color:#071018;font-weight:700;padding:10px 14px;border-radius:10px;cursor:pointer}
+    button.ghost{background:transparent;color:#93c5fd;border:1px solid #1f2a44}
+    button:disabled{opacity:.6;cursor:not-allowed}
+    .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;color:var(--muted);margin-top:10px}
+    .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--pill);color:var(--muted)}
+    .pill.ok{color:var(--ok)} .pill.err{color:#fecaca;border-color:#7f1d1d}
+    .status{margin-top:10px;min-height:1.2em}
+    .banner{display:none;margin:12px 0;padding:10px;border-radius:10px;border:1px solid #553;background:#2a1b0b;color:#ffd7a3}
+    .results{margin-top:16px;display:grid;gap:12px}
+    .item{background:#0b1220;border:1px solid var(--pill);border-radius:10px;padding:12px}
+    .item a{color:var(--accent);text-decoration:none}
+    .score-pos{color:var(--ok)} .score-neg{color:var(--err)}
+    .kbd{border:1px solid var(--border);border-bottom-width:3px;padding:1px 6px;border-radius:6px;font-family:ui-monospace,Consolas,monospace;font-size:12px;color:#cbd5e1}
+    .right{margin-left:auto}
+    .small{font-size:12px}
+    .spinner{width:14px;height:14px;border:2px solid #7dd3fc;border-top-color:transparent;border-radius:50%;display:inline-block;animation:spin .9s linear infinite}
+    details.logs{margin-top:10px}
+    .oktxt{color:var(--ok)} .errtxt{color:#fecaca} .warntxt{color:#fde68a}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* Chips */
+    .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+    .chip{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--pill);line-height:1.2}
+    .chip.bull{background:rgba(16,185,129,.12);color:#34d399;border-color:#065f46}
+    .chip.bear{background:rgba(239,68,68,.12);color:#f87171;border-color:#7f1d1d}
+    .chip.neutral{background:#0b1220;color:#9ca3af}
+    .chip.tag{background:#0b1220;color:#93c5fd;border-color:#1e3a8a}
+    .chip.warn{background:rgba(245,158,11,.12);color:#fbbf24;border-color:#92400e}
+
+    /* Summary box */
+    .summary-box { margin-top:8px; color:#cbd5e1; }
+    .summary-title { margin-top:6px; font-weight:600; color:#22d3ee }
+    .summary-text { margin:6px 0 4px; line-height:1.45 }
+    .summary-list { margin:6px 0 0 18px }
+
+    /* Reddit trending table */
+    .trend-grid{display:grid;grid-template-columns:80px 100px 1fr 120px 80px 110px;gap:6px;align-items:center}
+    .trend-header{font-weight:700;color:#a5b4fc}
+    .trend-row{padding:8px;border:1px solid var(--pill);border-radius:10px;background:#0b1220;display:grid;grid-template-columns:80px 100px 1fr 120px 80px 110px;gap:6px;align-items:center}
+    .trend-actions button{padding:6px 10px}
+
+    /* Login overlay */
+    .login-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(11,16,32,.95);backdrop-filter:blur(8px);z-index:1000;display:flex;align-items:center;justify-content:center}
+    .login-modal{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:32px;max-width:400px;width:90%;box-shadow:var(--shadow)}
+    .login-title{font-size:24px;font-weight:700;margin-bottom:8px;color:var(--text)}
+    .login-sub{color:var(--muted);margin-bottom:24px}
+    .login-field{margin-bottom:16px}
+    .login-field label{display:block;margin-bottom:6px;font-weight:600}
+    .login-field input{width:100%;box-sizing:border-box}
+    .login-actions{display:flex;gap:12px;margin-top:24px}
+    .login-actions button{flex:1}
+    .user-info{display:flex;align-items:center;gap:12px;color:var(--muted)}
+    .user-info .user-email{font-weight:600;color:var(--text)}
+    .usage-info{font-size:12px;color:var(--muted)}
+    /* Mobile Responsive */
+    @media (max-width: 768px) {
+      .wrap{margin:20px auto;padding:0 12px}
+      h1{font-size:20px}
+      .card{padding:12px;margin-bottom:12px}
+      .row{flex-direction:column;align-items:stretch}
+      input[type=text]{flex:1}
+      .key{min-width:100%;width:100%}
+      .toolbar{flex-direction:column;align-items:stretch;gap:8px}
+      .toolbar label{margin-bottom:4px}
+      .trend-grid,.trend-row{grid-template-columns:50px 70px 1fr 70px 50px;font-size:11px}
+      .trend-actions button{padding:4px 8px;font-size:11px}
+      .login-modal{margin:20px;padding:24px}
+      .login-title{font-size:20px}
+      .user-info{flex-direction:column;align-items:flex-start;gap:8px}
+      .usage-info{margin-bottom:8px}
+    }
+    
+    @media (max-width: 480px) {
+      .wrap{margin:12px auto;padding:0 8px}
+      h1{font-size:18px}
+      .card{padding:8px;border-radius:8px}
+      .trend-grid,.trend-row{grid-template-columns:40px 60px 1fr 60px 40px;font-size:10px}
+      .login-modal{margin:12px;padding:16px}
+      .login-actions{flex-direction:column}
+      .login-actions button{margin-bottom:8px}
+    }
+
+    /* PWA Safe Areas for iPhone X+ */
+    @supports (padding: max(0px)) {
+      .wrap{padding-left:max(12px, env(safe-area-inset-left));padding-right:max(12px, env(safe-area-inset-right))}
+      body{padding-bottom:env(safe-area-inset-bottom)}
+    }
+
+    /* iOS Safari fixes */
+    @supports (-webkit-touch-callout: none) {
+      .login-overlay{-webkit-overflow-scrolling:touch}
+      input{font-size:16px} /* Prevent zoom on focus */
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Super Fancy Market News Tool</h1>
+        <div class="sub">Finnhub free api if you dont have one - d473qopr01qh8nnb0j30d473qopr01qh8nnb0j3g</div>
+      </div>
+      <div class="user-info hidden" id="userInfo">
+        <span>Welcome <span class="user-email" id="userEmail"></span></span>
+        <div class="usage-info" id="usageInfo"></div>
+        <button id="btnLogout" class="ghost">Logout</button>
+      </div>
+    </header>
+
+    <div id="banner" class="banner"></div>
+
+    <!-- SETTINGS -->
+    <section class="card">
+      <div class="row">
+        <label for="keyFinnhub">Finnhub API key</label>
+        <input id="keyFinnhub" class="key" type="password" placeholder="Finnhub token (e.g., c123…)" />
+        <button id="btnSave">Save</button>
+        <span class="pill" id="pillKey">Not saved</span>
+        <button id="btnTest" title="Test this key">Test</button>
+      </div>
+      <div class="toolbar small">
+        <strong>Privacy:</strong> The key is stored only in <em>this browser</em> and sent directly to Finnhub.
+      </div>
+    </section>
+
+    <!-- SEARCH -->
+    <section class="card" aria-label="Search">
+      <div class="row">
+        <label for="ticker">Ticker</label>
+        <input id="ticker" type="text" placeholder="Try: NVDA, MSFT, AAPL" />
+        <button id="btnStart"><span class="spinner" id="spin" style="display:none"></span> Search</button>
+        <button id="btnCancel" class="ghost" disabled>Cancel</button>
+        <span class="right small sub" id="count"></span>
+      </div>
+      <div class="toolbar">
+        <label for="sort">Sort</label>
+        <select id="sort">
+          <option value="relevance">Relevance</option>
+          <option value="time">Newest</option>
+          <option value="impact">Impact score</option>
+        </select>
+        <label for="dedupe">De-dupe</label>
+        <select id="dedupe">
+          <option value="url">By URL</option>
+          <option value="title">By Title+Source</option>
+          <option value="off">Off</option>
+        </select>
+        <label for="maxResults">Max results</label>
+        <select id="maxResults">
+          <option>20</option>
+          <option>50</option>
+          <option selected>100</option>
+          <option>200</option>
+        </select>
+        <label for="daysBack">Days back</label>
+        <select id="daysBack">
+          <option value="1">1</option>
+          <option value="7" selected>7</option>
+          <option value="14">14</option>
+          <option value="30">30</option>
+          <option value="90">90</option>
+        </select>
+      </div>
+      <div id="status" class="status sub" aria-live="polite"></div>
+      <details class="logs"><summary>Status details</summary><div id="log" class="small"></div></details>
+      <div id="results" class="results" role="list"></div>
+      <div class="toolbar small">Tip: Press <span class="kbd">Enter</span> to search. Company news requires a <strong>ticker</strong>.</div>
+    </section>
+
+    <!-- REDDIT TRENDING -->
+    <section class="card" aria-label="Reddit Trending">
+      <div class="row">
+        <strong style="font-size:16px">Reddit Trending (past 24h)</strong>
+        <span class="pill">Most-mentioned tickers on stock subreddits</span>
+        <span class="right"></span>
+      </div>
+      <div class="toolbar">
+        <label for="trendFilter">Filter</label>
+        <select id="trendFilter" title="Pick scope">
+          <option value="all-stocks" selected>Popular subreddits</option>
+          <option value="stocks">r/stocks</option>
+          <option value="wallstreetbets">r/wallstreetbets</option>
+          <option value="investing">r/investing</option>
+          <option value="options">r/options</option>
+        </select>
+        <label for="trendLimit">Show</label>
+        <select id="trendLimit">
+          <option>10</option>
+          <option selected>25</option>
+          <option>50</option>
+        </select>
+        <label for="trendSort">Sort by</label>
+        <select id="trendSort">
+          <option value="rank" selected>Rank</option>
+          <option value="mentions">Mentions ↓</option>
+          <option value="upvotes">Upvotes ↓</option>
+          <option value="ticker">Ticker A-Z</option>
+        </select>
+        <button id="btnTrending"><span class="spinner" id="spinTrend" style="display:none"></span> Load Reddit Trending</button>
+      </div>
+      <div id="trendStatus" class="status sub"></div>
+      <div id="trendSource" class="pill" style="margin-top:8px;display:none"></div>
+      <div id="trendList" style="display:grid;gap:8px;margin-top:10px"></div>
+      <div class="small sub">Source: <span id="trendSourceLabel">Loading...</span></div>
+    </section>
+  </div>
+
+  <!-- LOGIN OVERLAY -->
+  <div class="login-overlay" id="loginOverlay">
+    <div class="login-modal">
+      <h2 class="login-title">Login Required</h2>
+      <p class="login-sub">Please login to access the market news tool</p>
+      
+      <div class="login-field">
+        <label for="loginEmail">Email</label>
+        <input id="loginEmail" type="email" placeholder="your@email.com" />
+      </div>
+      
+      <div class="login-field">
+        <label for="loginPassword">Password</label>
+        <input id="loginPassword" type="password" placeholder="Your password" />
+      </div>
+      
+      <div class="login-actions">
+        <button id="btnLogin">Login</button>
+        <button id="btnRegister" class="ghost">Register</button>
+      </div>
+      
+      <div id="loginStatus" class="status sub" style="margin-top:16px"></div>
+    </div>
+  </div>
+
+  <script>
+    /* ================== CONFIGURE YOUR WORKER ENDPOINTS ================== */
+    const SUMMARIZER_URL = 'https://summarizev3.451jscholz.workers.dev/summarize';
+    const TRENDING_URL = 'https://summarizev3.451jscholz.workers.dev/reddit-trending';
+    const AUTH_URL = 'https://summarizev3.451jscholz.workers.dev/auth';
+
+    /* ================== Banner if opened from file:// ================== */
+    (function(){
+      if(location.protocol === 'file:'){
+        const b = document.getElementById('banner');
+        b.style.display='block';
+        b.innerHTML = 'Opened locally';
+      }
+    })();
+
+    /* ================== Authentication System ================== */
+    const Auth = {
+      get session() { 
+        try {
+          return JSON.parse(localStorage.getItem('sns_auth_session') || 'null');
+        } catch {
+          return null;
+        }
+      },
+      set session(data) { 
+        localStorage.setItem('sns_auth_session', JSON.stringify(data));
+      },
+      get usage() {
+        try {
+          return JSON.parse(localStorage.getItem('sns_usage_tracking') || '{"requests":0,"lastReset":' + Date.now() + '}');
+        } catch {
+          return {requests:0,lastReset:Date.now()};
+        }
+      },
+      set usage(data) {
+        localStorage.setItem('sns_usage_tracking', JSON.stringify(data));
+      },
+      isLoggedIn() {
+        const session = this.session;
+        return session && session.email && session.expiresAt && Date.now() < session.expiresAt;
+      },
+      logout() {
+        localStorage.removeItem('sns_auth_session');
+        this.hideUserInfo();
+        this.showLogin();
+      },
+      showUserInfo() {
+        const session = this.session;
+        if (session) {
+          $('#userEmail').textContent = session.email;
+          $('#userInfo').classList.remove('hidden');
+          this.updateUsageDisplay();
+        }
+      },
+      hideUserInfo() {
+        $('#userInfo').classList.add('hidden');
+      },
+      showLogin() {
+        $('#loginOverlay').style.display = 'flex';
+      },
+      hideLogin() {
+        $('#loginOverlay').style.display = 'none';
+      },
+      trackUsage() {
+        let usage = this.usage;
+        const now = Date.now();
+        const dayMs = 24 * 60 * 60 * 1000;
+        
+        // Reset daily usage if needed
+        if (now - usage.lastReset > dayMs) {
+          usage = {requests:0,lastReset:now};
+        }
+        
+        usage.requests++;
+        this.usage = usage;
+        this.updateUsageDisplay();
+      },
+      updateUsageDisplay() {
+        const usage = this.usage;
+        const dailyLimit = 100; // Set your daily limit here
+        $('#usageInfo').textContent = `${usage.requests}/${dailyLimit} requests today`;
+      },
+      checkUsageLimit() {
+        const usage = this.usage;
+        const dailyLimit = 100;
+        return usage.requests < dailyLimit;
+      }
+    };
+
+    /* ================== Local storage for Finnhub key ================== */
+    const S = { get key(){ return localStorage.getItem('sns_finnhub_key') || '' }, set key(v){ localStorage.setItem('sns_finnhub_key', v) } };
+
+    /* ================== Helpers ================== */
+    const $ = s => document.querySelector(s);
+    const el = (t,p={},...c)=>{ const n=Object.assign(document.createElement(t),p); c.filter(x=>x!=null).forEach(x=>n.append(x)); return n; };
+    const setStatus = (m)=> $('#status').textContent = m || '';
+    const setCount = (n)=> $('#count').textContent = n? `${n} article${n===1?'':'s'}` : '';
+    const isTicker = (q)=> /^[A-Z.\-]{1,7}$/.test(String(q||'').trim());
+    const niceTime = (s)=>{ const d=new Date(s); return isNaN(d.getTime())? '' : d.toLocaleString(); };
+    const log = (msg, cls='')=> $('#log').append(el('div',{className:cls}, msg));
+    const clearLog = ()=> $('#log').innerHTML='';
+    const setLoginStatus = (m)=> $('#loginStatus').textContent = m || '';
+
+    /* ================== Authentication Functions ================== */
+    async function loginUser() {
+      const email = $('#loginEmail').value.trim();
+      const password = $('#loginPassword').value.trim();
+      
+      if (!email || !password) {
+        setLoginStatus('Please enter email and password');
+        return;
+      }
+      
+      setLoginStatus('Logging in...');
+      
+      try {
+        // For demo purposes, accept any email/password
+        // In production, replace with actual API call:
+        // const r = await fetch(AUTH_URL + '/login', {
+        //   method: 'POST',
+        //   headers: { 'Content-Type': 'application/json' },
+        //   body: JSON.stringify({ email, password })
+        // });
+        
+        // Demo authentication - remove this in production
+        if (email && password.length >= 4) {
+          const session = {
+            email: email,
+            token: 'demo-token-' + Date.now(),
+            expiresAt: Date.now() + (24 * 60 * 60 * 1000), // 24 hours
+            userId: 'demo-user'
+          };
+          
+          Auth.session = session;
+          Auth.hideLogin();
+          Auth.showUserInfo();
+          setLoginStatus('');
+          return;
+        }
+        
+        throw new Error('Invalid credentials');
+        
+      } catch (error) {
+        setLoginStatus('Login failed: ' + error.message);
+      }
+    }
+    
+    async function registerUser() {
+      const email = $('#loginEmail').value.trim();
+      const password = $('#loginPassword').value.trim();
+      
+      if (!email || !password) {
+        setLoginStatus('Please enter email and password');
+        return;
+      }
+      
+      if (password.length < 4) {
+        setLoginStatus('Password must be at least 4 characters');
+        return;
+      }
+      
+      setLoginStatus('Creating account...');
+      
+      try {
+        // For demo purposes, auto-register any valid email
+        // In production, replace with actual API call:
+        // const r = await fetch(AUTH_URL + '/register', {
+        //   method: 'POST',
+        //   headers: { 'Content-Type': 'application/json' },
+        //   body: JSON.stringify({ email, password })
+        // });
+        
+        // Demo registration - remove this in production
+        const session = {
+          email: email,
+          token: 'demo-token-' + Date.now(),
+          expiresAt: Date.now() + (24 * 60 * 60 * 1000),
+          userId: 'demo-user'
+        };
+        
+        Auth.session = session;
+        Auth.hideLogin();
+        Auth.showUserInfo();
+        setLoginStatus('');
+        
+      } catch (error) {
+        setLoginStatus('Registration failed: ' + error.message);
+      }
+    }
+    
+    function requireAuth() {
+      if (!Auth.isLoggedIn()) {
+        Auth.showLogin();
+        return false;
+      }
+      return true;
+    }
+
+    function decodeEntities(str) {
+      const txt = document.createElement('textarea');
+      txt.innerHTML = (str ?? '').toString();
+      return txt.value;
+    }
+    function cleanText(t) {
+      if (!t) return '';
+      let s = String(t).trim();
+      s = s.replace(/^```(?:json)?\s*/i,'').replace(/```$/,'').trim();
+      try {
+        const maybe = JSON.parse(s);
+        if (maybe && typeof maybe === 'object' && (maybe.summary || maybe.Summary)) {
+          s = String(maybe.summary || maybe.Summary || '');
+        }
+      } catch {}
+      s = s.replace(/^"(.*)"$/,'$1').replace(/^'(.*)'$/,'$1').trim();
+      return decodeEntities(s);
+    }
+    function cleanBullet(b) { let s = cleanText(b); s = s.replace(/^\s*[-•]\s*/,'').trim(); return s; }
+    function coerceBullets(raw) {
+      if (!raw) return [];
+      if (Array.isArray(raw)) return raw.map(cleanBullet).filter(Boolean);
+      if (typeof raw === 'string') return cleanText(raw).split(/\r?\n+/).map(x=>x.replace(/^\s*[-•]\s*/, '').trim()).filter(Boolean);
+      if (typeof raw === 'object') {
+        if (Array.isArray(raw.bullets)) return raw.bullets.map(cleanBullet).filter(Boolean);
+        const vals = Object.values(raw).filter(v => typeof v === 'string');
+        if (vals.length) return vals.map(cleanBullet).filter(Boolean);
+      }
+      return [];
+    }
+
+    /* ================== Sentiment scoring + tags ================== */
+    const POS = [/\bbeats?\b|surge|raise(s)? guidance|record(\s+\w+){0,3}\s+revenue|upgrade|outperform|accelerat(es|ed|ing)|tops? estimates|strong demand/i];
+    const NEG = [/\bmiss(es|ed)?\b|plunge|downgrade|recall|probe|investigation|cuts? guidance|guidance cut|sec\b|ftc\b|antitrust|shortfall|layoffs?/i];
+    function scoreHeadline(h){ let s=0; for(const r of POS) if(r.test(h)) s+=1; for(const r of NEG) if(r.test(h)) s-=1; return s; }
+    function sentimentFromScore(s){ return s>0? {label:'Bullish', cls:'bull'} : s<0? {label:'Bearish', cls:'bear'} : {label:'Neutral', cls:'neutral'}; }
+    function extractTags(h){
+      const tags=[];
+      if(/\bbeat(s|ing)?\b|tops? estimates|record/i.test(h)) tags.push({t:'Earnings', cls:'tag'});
+      if(/raise(s)? guidance|guidance\s+raised|increase\s+outlook/i.test(h)) tags.push({t:'Guidance ↑', cls:'tag'});
+      if(/cuts? guidance|guidance cut|lower(s)? outlook/i.test(h)) tags.push({t:'Guidance ↓', cls:'warn'});
+      if(/upgrade|initiates? (buy|outperform|overweight)/i.test(h)) tags.push({t:'Upgrade', cls:'tag'});
+      if(/downgrade|initiates? (sell|underperform|underweight)/i.test(h)) tags.push({t:'Downgrade', cls:'warn'});
+      if(/recall/i.test(h)) tags.push({t:'Recall', cls:'warn'});
+      if(/probe|investigation|sec\b|ftc\b|antitrust/i.test(h)) tags.push({t:'Regulatory', cls:'warn'});
+      if(/price target (raised|hiked)/i.test(h)) tags.push({t:'PT ↑', cls:'tag'});
+      if(/price target (cut|slashed)/i.test(h)) tags.push({t:'PT ↓', cls:'warn'});
+      return tags;
+    }
+
+    /* ================== Normalize + de-dupe ================== */
+    const norm = (items)=> (items||[]).map(a=>({
+      title: a.title||a.headline||'(no title)', url: a.url||a.link||'#', source: a.source||'News',
+      description: a.description||a.summary||'', publishedAt: a.publishedAt||a.pubDate||a.date||new Date().toISOString(), provider: 'finnhub'
+    }));
+
+    function dedupe(items, mode='url'){
+      if(mode==='off') return items; const out=[], seen=new Set();
+      for(const it of items){
+        let key='';
+        if(mode==='url' && it.url){ try{ const u=new URL(it.url); key=u.origin+u.pathname; }catch{ key=it.url; } }
+        else { key=(it.title||'')+'|'+(it.source||''); }
+        if(!seen.has(key)){ seen.add(key); out.push(it); }
+      } return out;
+    }
+
+    /* ================== Summarize & clean display ================== */
+    async function summarizeItem(it, box, btn) {
+      if (!requireAuth()) return;
+      if (!Auth.checkUsageLimit()) {
+        box.className = 'summary-box';
+        box.textContent = 'Daily usage limit reached. Please upgrade your plan.';
+        return;
+      }
+      
+      try {
+        btn.disabled = true; btn.textContent = 'Summarizing…';
+        box.innerHTML = '';
+
+        const payload = { url: it.url, title: it.title, source: it.source || 'News', publishedAt: it.publishedAt || '', max_words: 120, mode: 'auto' };
+        console.log('Summarizing:', { url: SUMMARIZER_URL, payload });
+        
+        const r = await fetch(SUMMARIZER_URL, { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          mode: 'cors'
+        });
+        
+        console.log('Summarize response:', r.status, r.statusText);
+        
+        if (!r.ok) throw new Error(`Summarizer HTTP ${r.status}`);
+        const j = await r.json();
+        console.log('Summarize JSON:', j);
+        
+        if (j.error) throw new Error(j.error);
+
+        Auth.trackUsage(); // Track this request
+
+        const cleanSummary = cleanText(j.summary ?? j.Summary ?? '');
+        let bulletsArr = coerceBullets(j.bullets ?? j.Bullets);
+
+        box.className = 'summary-box';
+        const badge = el('span', { className:'pill' }, j.from === 'full' ? 'From article' : 'From headline');
+        const sumTitle = el('div', { className:'summary-title' }, 'Summary');
+        const sumText = el('div', { className:'summary-text' }, cleanSummary || '(no summary)');
+        const bulletsTitle = bulletsArr.length ? el('div', { className:'summary-title' }, 'Key Points') : null;
+        const bullets = el('ul', { className:'summary-list' });
+        bulletsArr.forEach(b => bullets.append(el('li', {}, b)));
+
+        box.append(badge, sumTitle, sumText);
+        if (bulletsArr.length) box.append(bulletsTitle, bullets);
+
+      } catch (e) {
+        console.error('Summarize error:', e);
+        box.className = 'summary-box';
+        box.textContent = `Summary failed: ${e.message || e}`;
+      } finally {
+        btn.disabled = false; btn.textContent = 'Summarize';
+      }
+    }
+
+    /* ================== Render Finnhub items ================== */
+    function render(items){
+      const list = $('#results'); list.innerHTML='';
+      if(!items.length){ list.append(el('div',{className:'item'},'No articles found.')); setCount(0); return; }
+      const sort = $('#sort').value; const sorted=[...items];
+      if(sort==='time') sorted.sort((a,b)=>new Date(b.publishedAt)-new Date(a.publishedAt));
+      if(sort==='impact') sorted.sort((a,b)=>scoreHeadline(b.title)-scoreHeadline(a.title));
+
+      for(const it of sorted){
+        const s = scoreHeadline(it.title||''); const sent = sentimentFromScore(s);
+        const chips = extractTags(it.title||'');
+        const scoreTxt = s>0? `▲ +${s}` : s<0? `▼ ${s}` : '• 0'; const scoreCls = s>0? 'score-pos' : s<0? 'score-neg' : '';
+
+        const summaryBox = el('div', { className: 'summary-box' });
+        const sumBtn = el('button', { className: 'ghost', style:'margin-top:8px' }, 'Summarize');
+        sumBtn.addEventListener('click', () => summarizeItem(it, summaryBox, sumBtn));
+
+        list.append(
+          el('div',{className:'item',role:'listitem'},
+            el('div',{}, el('span',{className:'pill'}, niceTime(it.publishedAt)), el('span',{className:'pill'}, it.source||'News'), el('span',{className:'pill'}, 'Finnhub')),
+            el('div',{}, el('a',{href:it.url,target:'_blank',rel:'noopener noreferrer'}, it.title)),
+            it.description? el('div',{style:'color:#94a3b8;margin-top:6px'}, it.description) : null,
+            el('div',{className:'chips'},
+              el('span',{className:`chip ${sent.cls}`}, sent.label),
+              ...chips.map(c=> el('span',{className:`chip ${c.cls}`}, c.t))
+            ),
+            el('div',{}, sumBtn),
+            summaryBox,
+            el('div',{style:'margin-top:6px'}, el('strong',{className:scoreCls}, `Impact score: ${scoreTxt}`))
+          )
+        );
+      }
+      setCount(items.length);
+    }
+
+    /* ================== Networking (Finnhub) ================== */
+    let inflight = [];
+    function makeTimedFetch(ms){
+      return (url, options={})=>{
+        const ctrl = new AbortController(); const id = setTimeout(()=>ctrl.abort(), ms); inflight.push(ctrl);
+        return fetch(url, {...options, signal: ctrl.signal}).finally(()=>{ clearTimeout(id); inflight = inflight.filter(c=>c!==ctrl); });
+      };
+    }
+    const tfetch10 = makeTimedFetch(10000);
+
+    function isoFromDaysBack(days){ const to=new Date(); const from=new Date(Date.now()-days*24*60*60*1000); return {from,to}; }
+    async function fetchFinnhub(symbol, key, daysBack, max){
+      if(!isTicker(symbol)) throw new Error('Ticker required, e.g., NVDA');
+      const {from,to} = isoFromDaysBack(daysBack);
+      const url = new URL('https://finnhub.io/api/v1/company-news');
+      url.searchParams.set('symbol', symbol.trim().toUpperCase());
+      url.searchParams.set('from', from.toISOString().slice(0,10));
+      url.searchParams.set('to', to.toISOString().slice(0,10));
+      url.searchParams.set('token', key);
+      const r = await tfetch10(url);
+      if(!r.ok) throw new Error(`Finnhub HTTP ${r.status}`);
+      const j = await r.json();
+      const items = (Array.isArray(j)? j: []).map(a=>({ title: a.headline, url: a.url, source: a.source, description: a.summary, publishedAt: a.datetime? new Date(a.datetime*1000).toISOString(): undefined }));
+      return norm(items).slice(0, max);
+    }
+
+    /* ================== Reddit Trending (with fallback to mock data) ================== */
+    let currentTrendingData = [];
+
+    async function loadTrending(){
+      if (!requireAuth()) return;
+      if (!Auth.checkUsageLimit()) {
+        $('#trendStatus').textContent = 'Daily usage limit reached. Please upgrade your plan.';
+        return;
+      }
+      
+      const filter = $('#trendFilter').value;
+      const limit  = parseInt($('#trendLimit').value,10) || 25;
+      const spin = $('#spinTrend'); spin.style.display='inline-block';
+      $('#trendStatus').textContent = 'Loading Reddit trending…';
+      $('#trendList').innerHTML = '';
+      let source = 'Unknown';
+      try{
+        Auth.trackUsage(); // Track this request
+        // Try Worker first
+        try {
+          const qs = new URLSearchParams({ filter, limit: String(limit) });
+          const url = `${TRENDING_URL}?${qs.toString()}`;
+          const r = await fetch(url, { method: 'GET', mode: 'cors' });
+          if(r.ok) {
+            const data = await r.json();
+            source = data.note ? '📊 Demo Data (Worker API failed)' : '✅ Reddit';
+            $('#trendStatus').textContent = `${data.count} trending tickers • ${new Date(data.asOf).toLocaleString()}`;
+            $('#trendSourceLabel').textContent = source;
+            currentTrendingData = data.results || [];
+            renderTrending(currentTrendingData);
+            return;
+          }
+        } catch (workerError) {
+          console.log('Worker failed:', workerError.message);
+        }
+
+        // Try Finnhub trending (more reliable)
+        const finnhubKey = $('#keyFinnhub').value.trim();
+        if (finnhubKey) {
+          try {
+            const r = await fetch(`https://finnhub.io/api/v1/news?category=general&limit=${limit}&token=${finnhubKey}`);
+            if(r.ok) {
+              const data = await r.json();
+              const tickers = {};
+              (data || []).forEach(article => {
+                const matches = article.headline.match(/\b[A-Z]{1,5}\b/g) || [];
+                matches.forEach(ticker => {
+                  if (!tickers[ticker]) tickers[ticker] = { ticker, mentions: 0, name: ticker, upvotes: 0 };
+                  tickers[ticker].mentions++;
+                });
+              });
+              const results = Object.values(tickers)
+                .sort((a,b) => b.mentions - a.mentions)
+                .slice(0, limit)
+                .map((item, idx) => ({...item, rank: idx + 1}));
+              if (results.length > 0) {
+                source = '✅ Real Data (Finnhub API)';
+                $('#trendStatus').textContent = `${results.length} trending tickers • ${new Date().toLocaleString()}`;
+                $('#trendSourceLabel').textContent = source;
+                currentTrendingData = results;
+                renderTrending(currentTrendingData);
+                return;
+              }
+            }
+          } catch (e) {
+            console.log('Finnhub trending failed:', e.message);
+          }
+        }
+
+        // Fallback: Mock trending data (demo)
+        const mockTrending = [
+          { rank: 1, ticker: 'NVDA', name: 'NVIDIA Corp', mentions: 1247, upvotes: 3421 },
+          { rank: 2, ticker: 'TSLA', name: 'Tesla Inc', mentions: 1089, upvotes: 2983 },
+          { rank: 3, ticker: 'MSFT', name: 'Microsoft Corp', mentions: 956, upvotes: 2654 },
+          { rank: 4, ticker: 'AAPL', name: 'Apple Inc', mentions: 847, upvotes: 2341 },
+          { rank: 5, ticker: 'AMZN', name: 'Amazon.com Inc', mentions: 743, upvotes: 2015 },
+          { rank: 6, ticker: 'GOOGL', name: 'Alphabet Inc', mentions: 698, upvotes: 1876 },
+          { rank: 7, ticker: 'META', name: 'Meta Platforms', mentions: 612, upvotes: 1654 },
+          { rank: 8, ticker: 'NFLX', name: 'Netflix Inc', mentions: 534, upvotes: 1423 },
+          { rank: 9, ticker: 'COIN', name: 'Coinbase Global', mentions: 478, upvotes: 1287 },
+          { rank: 10, ticker: 'AI', name: 'C3 Metrics Inc', mentions: 412, upvotes: 1098 },
+        ].slice(0, limit);
+        
+        source = '📊 Demo Data (No API available)';
+        $('#trendStatus').textContent = `${mockTrending.length} trending tickers • ${new Date().toLocaleString()}`;
+        $('#trendSourceLabel').textContent = source;
+        currentTrendingData = mockTrending;
+        renderTrending(currentTrendingData);
+      }catch(e){
+        source = '📊 Demo Data (Error occurred)';
+        $('#trendStatus').textContent = `Trending failed: ${e.message||e}.`;
+        $('#trendSourceLabel').textContent = source;
+        // Show demo data on any error
+        const demoData = [
+          { rank: 1, ticker: 'NVDA', name: 'NVIDIA Corp', mentions: 1247, upvotes: 3421 },
+          { rank: 2, ticker: 'TSLA', name: 'Tesla Inc', mentions: 1089, upvotes: 2983 },
+          { rank: 3, ticker: 'MSFT', name: 'Microsoft Corp', mentions: 956, upvotes: 2654 },
+        ];
+        currentTrendingData = demoData;
+        renderTrending(currentTrendingData.slice(0, limit));
+      }finally{
+        spin.style.display='none';
+      }
+    }
+
+    function renderTrending(rows){
+      const host = $('#trendList'); host.innerHTML = '';
+      if(!rows.length){ host.textContent = 'No trending tickers found.'; return; }
+
+      // Apply sorting
+      const sortBy = $('#trendSort').value;
+      let sortedRows = [...rows];
+      
+      switch(sortBy) {
+        case 'mentions':
+          sortedRows.sort((a, b) => (b.mentions || 0) - (a.mentions || 0));
+          break;
+        case 'upvotes':
+          sortedRows.sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0));
+          break;
+        case 'ticker':
+          sortedRows.sort((a, b) => (a.ticker || '').localeCompare(b.ticker || ''));
+          break;
+        case 'rank':
+        default:
+          sortedRows.sort((a, b) => (a.rank || 999) - (b.rank || 999));
+          break;
+      }
+
+      host.append(el('div',{className:'trend-grid trend-header'},
+        el('div',{},'#'),
+        el('div',{},'Ticker'),
+        el('div',{},'Name'),
+        el('div',{},'Mentions'),
+        el('div',{},'Upvotes'),
+        el('div',{},'Action')
+      ));
+
+      sortedRows.forEach(r=>{
+        const row = el('div',{className:'trend-row'},
+          el('div',{}, String(r.rank ?? '')),
+          el('div',{}, String(r.ticker ?? '')),
+          el('div',{}, String(r.name ?? '')),
+          el('div',{}, String(r.mentions ?? '')),
+          el('div',{}, String(r.upvotes ?? '')),
+          el('div',{className:'trend-actions'},
+            el('button',{className:'ghost',onclick:()=>{ $('#ticker').value = (r.ticker||'').toUpperCase(); startSearch(); }},'Open News')
+          )
+        );
+        host.append(row);
+      });
+    }
+
+    function sortTrendingData() {
+      if (currentTrendingData.length > 0) {
+        renderTrending(currentTrendingData);
+      }
+    }
+
+    /* ================== Key test / UI wiring ================== */
+    async function testKey(){
+      const key = $('#keyFinnhub').value.trim();
+      try {
+        if(!key) throw new Error('No key');
+        await fetchFinnhub('MSFT', key, 7, 1);
+        setKeyPill('OK', true); log('Finnhub: OK','oktxt');
+      } catch(e) {
+        if(e.name==='AbortError'){ setKeyPill('Timeout', false); log('Finnhub: timed out (10s)','warntxt'); return; }
+        if(e instanceof TypeError){ setKeyPill('Network/CORS', false); log('Finnhub: network/CORS issue','errtxt'); return; }
+        setKeyPill((e.message||'Error').slice(0,60), false); log(`Finnhub: ${e.message||e}`,'errtxt');
+      }
+    }
+    function setKeyPill(text, ok){ const p = $('#pillKey'); p.textContent = text; p.classList.remove('ok','err'); p.classList.add(ok? 'ok':'err'); }
+
+    async function startSearch(){
+      if (!requireAuth()) return;
+      if (!Auth.checkUsageLimit()) {
+        setStatus('Daily usage limit reached. Please upgrade your plan.');
+        return;
+      }
+      
+      clearLog();
+      const key=$('#keyFinnhub').value.trim(); const symbol=$('#ticker').value.trim();
+      const daysBack=parseInt($('#daysBack').value,10); const max=parseInt($('#maxResults').value,10);
+      if(!key){ setStatus('Paste your Finnhub key and click Save.'); return; }
+      if(!symbol){ setStatus('Type a ticker, e.g., NVDA.'); return; }
+      setStatus('Fetching company news…'); $('#btnStart').disabled=true; $('#btnCancel').disabled=true; $('#spin').style.display='inline-block';
+      try{
+        Auth.trackUsage(); // Track this request
+        const items = await fetchFinnhub(symbol, key, daysBack, max);
+        const deduped = dedupe(items, $('#dedupe').value);
+        render(deduped);
+        setStatus(deduped.length? '' : 'No results.');
+      } catch(e){
+        if(e.name==='AbortError'){ setStatus('Timed out (10s). Try again.'); log('Finnhub: timed out (10s)','warntxt'); }
+        else if(e instanceof TypeError){ setStatus('Network/CORS error. If opened as file://, host over HTTPS.'); log('Finnhub: network/CORS issue','errtxt'); }
+        else { setStatus(e.message||String(e)); log(`Finnhub: ${e.message||e}`,'errtxt'); }
+      } finally {
+        $('#btnStart').disabled=false; $('#btnCancel').disabled=true; $('#spin').style.display='none';
+      }
+    }
+    function cancelSearch(){ inflight.forEach(c=>c.abort()); inflight=[]; setStatus('Canceled.'); $('#btnStart').disabled=false; $('#btnCancel').disabled=true; $('#spin').style.display='none'; log('Canceled current requests.','warntxt'); }
+
+    (function init(){
+      // Initialize authentication
+      if (Auth.isLoggedIn()) {
+        Auth.hideLogin();
+        Auth.showUserInfo();
+      } else {
+        Auth.showLogin();
+      }
+      
+      $('#keyFinnhub').value = S.key || ''; setKeyPill(S.key? 'Saved' : 'Not saved', !!S.key);
+      $('#btnSave').addEventListener('click', ()=>{ S.key = $('#keyFinnhub').value.trim(); setKeyPill(S.key? 'Saved':'Not saved', !!S.key); });
+      $('#btnTest').addEventListener('click', testKey);
+      $('#btnStart').addEventListener('click', startSearch);
+      $('#btnCancel').addEventListener('click', cancelSearch);
+      $('#ticker').addEventListener('keydown',(e)=>{ if(e.key==='Enter') startSearch(); });
+
+      $('#btnTrending').addEventListener('click', loadTrending);
+      $('#trendSort').addEventListener('change', sortTrendingData);
+      
+      // Authentication event listeners
+      $('#btnLogin').addEventListener('click', loginUser);
+      $('#btnRegister').addEventListener('click', registerUser);
+      $('#btnLogout').addEventListener('click', Auth.logout.bind(Auth));
+      
+      // Handle Enter key in login fields
+      $('#loginPassword').addEventListener('keydown',(e)=>{ if(e.key==='Enter') loginUser(); });
+      $('#loginEmail').addEventListener('keydown',(e)=>{ if(e.key==='Enter') loginUser(); });
+
+      ['sort','dedupe','maxResults','daysBack'].forEach(id=>{
+        document.getElementById(id).addEventListener('change',()=>{
+          const cards = Array.from($('#results').children).map(card=>({
+            title: card.querySelector('a')?.textContent||'',
+            url: card.querySelector('a')?.href||'#',
+            source: card.querySelectorAll('.pill')[1]?.textContent||'News',
+            description: card.querySelector("div[style^='color']")?.textContent||'',
+            publishedAt: card.querySelectorAll('.pill')[0]?.textContent||new Date().toISOString()
+          }));
+          const max = parseInt($('#maxResults').value,10);
+          render(cards.slice(0,max));
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
