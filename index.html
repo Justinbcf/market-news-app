@@ -670,10 +670,26 @@
     
     // Add approval button for demo
     function addApprovalButton() {
+      console.log('🔍 Adding debug buttons...');
+      console.log('🔍 Is trial user:', Auth.isTrialUser());
+      console.log('🔍 Session exists:', !!Auth.session);
+      
+      // Always add debug button for testing
+      const debugBtn = el('button', {
+        className: 'ghost',
+        style: 'position: fixed; top: 10px; right: 10px; z-index: 1000; background: #ef4444; color: white; padding: 8px 12px; border-radius: 6px; font-size: 12px;',
+        onclick: () => {
+          testEmailJS();
+        }
+      }, '🐛 Test EmailJS');
+      document.body.appendChild(debugBtn);
+      console.log('✅ Debug button added');
+      
+      // Add approval button only for trial users
       if (Auth.isTrialUser()) {
         const approveBtn = el('button', {
           className: 'ghost',
-          style: 'position: fixed; top: 10px; right: 10px; z-index: 1000; background: #f59e0b; color: white; padding: 8px 12px; border-radius: 6px; font-size: 12px;',
+          style: 'position: fixed; top: 50px; right: 10px; z-index: 1000; background: #f59e0b; color: white; padding: 8px 12px; border-radius: 6px; font-size: 12px;',
           onclick: () => {
             const code = prompt('Enter approval code from email:');
             if (code && code.length === 6) {
@@ -682,7 +698,37 @@
           }
         }, '🔓 Admin Approve');
         document.body.appendChild(approveBtn);
+        console.log('✅ Approval button added (trial user)');
+      } else {
+        console.log('⚠️ Not a trial user, no approval button added');
       }
+    }
+    
+    // Test EmailJS function
+    function testEmailJS() {
+      console.log('🧪 Testing EmailJS directly...');
+      
+      const testData = {
+        name: 'Debug Test User',
+        email: 'test@example.com',
+        company: 'Test Company',
+        use_case: 'Debugging',
+        details: 'This is a test email',
+        registered_at: new Date().toLocaleString(),
+        approval_code: 'TEST123'
+        // NO recipient field - EmailJS sends to configured Gmail automatically
+      };
+      
+      console.log('📧 Test data:', testData);
+      
+      emailjs.send("service_ka4cdgv", "template_t964p3h", testData).then(function(response) {
+        console.log('✅ TEST EmailJS sent!', response.status, response.text);
+        alert('✅ Test email sent successfully! Check your Gmail.');
+      }, function(error) {
+        console.log('❌ TEST EmailJS failed:', error);
+        console.log('🔍 Full error:', JSON.stringify(error, null, 2));
+        alert(`❌ Test failed: ${error.text || JSON.stringify(error)}`);
+      });
     }
     
     // Approve user with code
@@ -882,17 +928,45 @@
         console.log('👤 User email:', session.email);
         console.log('📧 Sending to: 451jscholz@gmail.com');
         
-        emailjs.send("service_ka4cdgv", "template_t964p3h", {
+        // Debug: Check EmailJS is initialized
+        // Debug: Test EmailJS init
+        try {
+          console.log('🔍 Testing EmailJS before send...');
+          if (typeof emailjs === 'undefined') {
+            throw new Error('EmailJS not loaded');
+          }
+          if (!emailjs.send) {
+            throw new Error('EmailJS.send method not available');
+          }
+          console.log('✅ EmailJS appears to be working');
+        } catch (e) {
+          console.error('❌ EmailJS initialization error:', e);
+          statusDiv.innerHTML = `
+            <strong>❌ EmailJS Error</strong><br>
+            ${e.message}<br>
+            <small>Please refresh the page and try again.</small>
+          `;
+          statusDiv.style.color = '#f87171';
+          return;
+        }
+        
+        console.log('🚀 Sending EmailJS request now...');
+        
+        // Prepare email data (NO recipient field needed)
+        const emailData = {
           name: name,
-          user_email: session.email,  // User's email (for display)
+          email: session.email,  // User's email (for display)
           company: company,
           use_case: useCase,
           details: details,
           registered_at: new Date().toLocaleString(),
-          approval_code: approvalCode,
-          // EmailJS recipient field - YOUR email
-          to_email: "451jscholz@gmail.com"
-        }).then(function(response) {
+          approval_code: approvalCode
+          // NO recipient field - EmailJS sends to your configured Gmail automatically
+        };
+        
+        console.log('📧 Email data being sent:', emailData);
+        
+        emailjs.send("service_ka4cdgv", "template_t964p3h", emailData).then(function(response) {
           console.log('✅ Email notification sent!', response.status, response.text);
           console.log('📧 Response details:', response);
           statusDiv.innerHTML = `
@@ -903,14 +977,27 @@
           statusDiv.style.color = '#34d399';
         }, function(error) {
           console.log('❌ EmailJS failed:', error);
-          console.log('🔍 Error details:', error);
-          console.log('🔍 Error text:', error.text);
+          console.log('🔍 Full error object:', JSON.stringify(error, null, 2));
           console.log('🔍 Error status:', error.status);
+          console.log('🔍 Error text:', error.text);
+          console.log('🔍 Error type:', typeof error);
+          console.log('🔍 Error keys:', Object.keys(error));
+          
+          // Try to extract more error info
+          let errorMessage = 'Unknown error occurred';
+          if (error.text) {
+            errorMessage = error.text;
+          } else if (error.message) {
+            errorMessage = error.message;
+          } else if (typeof error === 'string') {
+            errorMessage = error;
+          }
+          
           statusDiv.innerHTML = `
             <strong>⚠️ Registration Submitted!</strong><br>
             Your registration was received but email notification failed.<br>
-            <small>Error: ${error.text || 'Unknown error'}</small><br>
-            <small>Please contact admin@yourcompany.com directly.</small>
+            <small>Error: ${errorMessage}</small><br>
+            <small>Check browser console (F12) for details.</small>
           `;
           statusDiv.style.color = '#fbbf24';
         });
