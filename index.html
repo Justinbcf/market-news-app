@@ -17,15 +17,6 @@
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%230b1020' width='180' height='180'/><text x='90' y='110' font-family='Arial' font-size='100' fill='%2322d3ee' text-anchor='middle'>📈</text></svg>" />
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%230b1020' width='180' height='180'/><text x='90' y='110' font-family='Arial' font-size='100' fill='%2322d3ee' text-anchor='middle'>📈</text></svg>" />
   
-  <!-- EmailJS for notifications (no backend required) -->
-  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
-  <script type="text/javascript">
-    (function() {
-      // Replace with your actual Public Key from EmailJS
-      emailjs.init("cfnTrL1SPTMf8H12c");
-    })();
-  </script>
-  
   <!-- Service Worker Registration -->
   <script>
     if ('serviceWorker' in navigator) {
@@ -104,8 +95,6 @@
     .login-field{margin-bottom:16px}
     .login-field label{display:block;margin-bottom:6px;font-weight:600}
     .login-field input{width:100%;box-sizing:border-box}
-    .login-field select{width:100%;box-sizing:border-box;background:#0b1220;color:var(--text);border:1px solid var(--pill);border-radius:10px;padding:10px;font-family:inherit}
-    .login-field select option{background:#0b1220;color:var(--text)}
     .login-actions{display:flex;gap:12px;margin-top:24px}
     .login-actions button{flex:1}
     .user-info{display:flex;align-items:center;gap:12px;color:var(--muted)}
@@ -121,24 +110,8 @@
       .key{min-width:100%;width:100%}
       .toolbar{flex-direction:column;align-items:stretch;gap:8px}
       .toolbar label{margin-bottom:4px}
-      
-      /* Better mobile Reddit table */
-      .trend-grid{display:none} /* Hide desktop header */
-      .trend-row{display:flex;flex-direction:column;padding:12px;gap:8px}
-      .trend-row > div{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--pill)}
-      .trend-row > div:last-child{border-bottom:none}
-      .trend-row > div:before{content:attr(data-label);font-weight:600;color:var(--muted);font-size:11px}
-      .trend-actions{margin-top:8px;border-bottom:none !important}
-      .trend-actions button{width:100%;padding:8px}
-      
-      /* Mobile trending header */
-      .mobile-trend-header{display:block;font-weight:700;color:#a5b4fc;padding:8px 0;margin-bottom:8px;border-bottom:2px solid var(--border)}
-      
-      /* Hide mobile header on desktop */
-      @media (min-width: 769px) {
-        .mobile-trend-header{display:none}
-      }
-      
+      .trend-grid,.trend-row{grid-template-columns:50px 70px 1fr 70px 50px;font-size:11px}
+      .trend-actions button{padding:4px 8px;font-size:11px}
       .login-modal{margin:20px;padding:24px}
       .login-title{font-size:20px}
       .user-info{flex-direction:column;align-items:flex-start;gap:8px}
@@ -149,12 +122,7 @@
       .wrap{margin:12px auto;padding:0 8px}
       h1{font-size:18px}
       .card{padding:8px;border-radius:8px}
-      
-      /* Compact mobile Reddit table */
-      .trend-row{padding:8px;font-size:12px}
-      .trend-row > div{font-size:11px}
-      .trend-actions button{font-size:11px;padding:6px}
-      
+      .trend-grid,.trend-row{grid-template-columns:40px 60px 1fr 60px 40px;font-size:10px}
       .login-modal{margin:12px;padding:16px}
       .login-actions{flex-direction:column}
       .login-actions button{margin-bottom:8px}
@@ -351,14 +319,6 @@
         const session = this.session;
         return session && session.email && session.expiresAt && Date.now() < session.expiresAt;
       },
-      isApproved() {
-        const session = this.session;
-        return session && session.approved === true;
-      },
-      isTrialUser() {
-        const session = this.session;
-        return session && session.approved !== true;
-      },
       logout() {
         localStorage.removeItem('sns_auth_session');
         this.hideUserInfo();
@@ -397,55 +357,13 @@
       },
       updateUsageDisplay() {
         const usage = this.usage;
-        const session = this.session;
-        let dailyLimit = 5; // Trial users get 5 requests
-        
-        if (session && session.approved === true) {
-          dailyLimit = 100; // Approved users get 100 requests
-        }
-        
-        const status = session && session.approved === true ? '✅ Approved' : '🔒 Trial';
-        $('#usageInfo').textContent = `${status} • ${usage.requests}/${dailyLimit} requests today`;
+        const dailyLimit = 100; // Set your daily limit here
+        $('#usageInfo').textContent = `${usage.requests}/${dailyLimit} requests today`;
       },
       checkUsageLimit() {
         const usage = this.usage;
-        const session = this.session;
-        let dailyLimit = 5; // Trial limit
-        
-        if (session && session.approved === true) {
-          dailyLimit = 100; // Approved limit
-        }
-        
+        const dailyLimit = 100;
         return usage.requests < dailyLimit;
-      },
-      requireApproval(feature) {
-        const session = this.session;
-        if (!session || !session.email) {
-          this.showLogin();
-          return false;
-        }
-        
-        if (session.approved !== true) {
-          this.showApprovalBanner(feature);
-          return false;
-        }
-        
-        return true;
-      },
-      showApprovalBanner(feature) {
-        const banner = document.getElementById('banner') || document.createElement('div');
-        banner.id = 'banner';
-        banner.className = 'banner';
-        banner.style.display = 'block';
-        banner.innerHTML = `
-          <strong>🔒 Approval Required</strong><br>
-          This feature requires account approval. Please <a href="#register" onclick="showRegistrationForm()" style="color: #22d3ee; text-decoration: underline;">register for full access</a>.
-          <br><small>Trial users have limited functionality.</small>
-        `;
-        
-        if (!document.getElementById('banner')) {
-          document.querySelector('.wrap').insertBefore(banner, document.querySelector('.card'));
-        }
       }
     };
 
@@ -464,24 +382,12 @@
     const setLoginStatus = (m)=> $('#loginStatus').textContent = m || '';
 
     /* ================== Authentication Functions ================== */
-    
-    // Email validation function
-    function isValidEmail(email) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      return emailRegex.test(email.toLowerCase());
-    }
-    
     async function loginUser() {
       const email = $('#loginEmail').value.trim();
       const password = $('#loginPassword').value.trim();
       
       if (!email || !password) {
         setLoginStatus('Please enter email and password');
-        return;
-      }
-      
-      if (!isValidEmail(email)) {
-        setLoginStatus('Please enter a valid email address');
         return;
       }
       
@@ -498,53 +404,17 @@
         
         // Demo authentication - remove this in production
         if (email && password.length >= 4) {
-          // Check if this is a pre-approved email (demo)
-          const approvedEmails = ['admin@demo.com', 'approved@demo.com'];
-          const isApproved = approvedEmails.includes(email.toLowerCase());
-          
           const session = {
             email: email,
-            token: isApproved ? 'approved-token-' + Date.now() : 'trial-token-' + Date.now(),
+            token: 'demo-token-' + Date.now(),
             expiresAt: Date.now() + (24 * 60 * 60 * 1000), // 24 hours
-            userId: isApproved ? 'approved-user' : 'trial-user',
-            approved: isApproved,
-            registeredAt: Date.now()
+            userId: 'demo-user'
           };
           
           Auth.session = session;
           Auth.hideLogin();
           Auth.showUserInfo();
           setLoginStatus('');
-          
-          // Show appropriate welcome message
-          if (isApproved) {
-            const banner = document.getElementById('banner') || document.createElement('div');
-            banner.id = 'banner';
-            banner.className = 'banner';
-            banner.style.display = 'block';
-            banner.innerHTML = `
-              <strong>✅ Welcome Back!</strong><br>
-              You have full access to all features.
-            `;
-            
-            if (!document.getElementById('banner')) {
-              document.querySelector('.wrap').insertBefore(banner, document.querySelector('.card'));
-            }
-          } else {
-            const banner = document.getElementById('banner') || document.createElement('div');
-            banner.id = 'banner';
-            banner.className = 'banner';
-            banner.style.display = 'block';
-            banner.innerHTML = `
-              <strong>🔒 Trial Account</strong><br>
-              You have limited access. <a href="#register" onclick="showRegistrationForm()" style="color: #22d3ee; text-decoration: underline;">Register for full access</a>.
-            `;
-            
-            if (!document.getElementById('banner')) {
-              document.querySelector('.wrap').insertBefore(banner, document.querySelector('.card'));
-            }
-          }
-          
           return;
         }
         
@@ -564,11 +434,6 @@
         return;
       }
       
-      if (!isValidEmail(email)) {
-        setLoginStatus('Please enter a valid email address');
-        return;
-      }
-      
       if (password.length < 4) {
         setLoginStatus('Password must be at least 4 characters');
         return;
@@ -577,7 +442,7 @@
       setLoginStatus('Creating account...');
       
       try {
-        // For demo purposes, auto-register any valid email as trial user
+        // For demo purposes, auto-register any valid email
         // In production, replace with actual API call:
         // const r = await fetch(AUTH_URL + '/register', {
         //   method: 'POST',
@@ -588,38 +453,15 @@
         // Demo registration - remove this in production
         const session = {
           email: email,
-          token: 'trial-token-' + Date.now(),
+          token: 'demo-token-' + Date.now(),
           expiresAt: Date.now() + (24 * 60 * 60 * 1000),
-          userId: 'trial-user',
-          approved: false, // Start as trial user
-          registeredAt: Date.now()
+          userId: 'demo-user'
         };
         
         Auth.session = session;
         Auth.hideLogin();
         Auth.showUserInfo();
         setLoginStatus('');
-        
-        // Show welcome message for trial users
-        const banner = document.getElementById('banner') || document.createElement('div');
-        banner.id = 'banner';
-        banner.className = 'banner';
-        banner.style.display = 'block';
-        banner.innerHTML = `
-          <strong>🎉 Welcome to Your Trial!</strong><br>
-          Your account has been created. You have limited access to test the platform.
-          <br><br>
-          <strong>For full access:</strong><br>
-          📝 <a href="#register" onclick="showRegistrationForm()" style="color: #22d3ee; text-decoration: underline;">Complete your registration</a><br>
-          📋 Include your name and intended use<br>
-          ⏱️ Approval typically within 24 hours
-          <br><br>
-          <small>Trial limitations: 5 requests per day, limited features</small>
-        `;
-        
-        if (!document.getElementById('banner')) {
-          document.querySelector('.wrap').insertBefore(banner, document.querySelector('.card'));
-        }
         
       } catch (error) {
         setLoginStatus('Registration failed: ' + error.message);
@@ -632,442 +474,6 @@
         return false;
       }
       return true;
-    }
-    
-    // Admin function to approve users (for demo)
-    function approveUser(email) {
-      const session = Auth.session;
-      if (session && session.email === email.toLowerCase()) {
-        session.approved = true;
-        Auth.session = session;
-        Auth.showUserInfo();
-        
-        // Hide approval banner
-        const banner = document.getElementById('banner');
-        if (banner) {
-          banner.style.display = 'none';
-        }
-        
-        // Show success message
-        const successBanner = document.createElement('div');
-        successBanner.className = 'banner';
-        successBanner.style.display = 'block';
-        successBanner.style.background = '#065f46';
-        successBanner.style.borderColor = '#065f46';
-        successBanner.innerHTML = `
-          <strong>✅ Account Approved!</strong><br>
-          You now have full access to all features.
-        `;
-        
-        document.querySelector('.wrap').insertBefore(successBanner, document.querySelector('.card'));
-        
-        // Hide success message after 5 seconds
-        setTimeout(() => {
-          successBanner.style.display = 'none';
-        }, 5000);
-      }
-    }
-    
-    // Add approval button for demo
-    function addApprovalButton() {
-      console.log('🔍 Adding debug buttons...');
-      console.log('🔍 Is trial user:', Auth.isTrialUser());
-      console.log('🔍 Session exists:', !!Auth.session);
-      
-      // Always add debug button for testing
-      const debugBtn = el('button', {
-        className: 'ghost',
-        style: 'position: fixed; top: 10px; right: 10px; z-index: 1000; background: #ef4444; color: white; padding: 8px 12px; border-radius: 6px; font-size: 12px;',
-        onclick: () => {
-          testEmailJS();
-        }
-      }, '🐛 Test EmailJS');
-      document.body.appendChild(debugBtn);
-      console.log('✅ Debug button added');
-      
-      // Add approval button only for trial users
-      if (Auth.isTrialUser()) {
-        const approveBtn = el('button', {
-          className: 'ghost',
-          style: 'position: fixed; top: 50px; right: 10px; z-index: 1000; background: #f59e0b; color: white; padding: 8px 12px; border-radius: 6px; font-size: 12px;',
-          onclick: () => {
-            const code = prompt('Enter approval code from email:');
-            if (code && code.length === 6) {
-              approveWithCode(code);
-            }
-          }
-        }, '🔓 Admin Approve');
-        document.body.appendChild(approveBtn);
-        console.log('✅ Approval button added (trial user)');
-      } else {
-        console.log('⚠️ Not a trial user, no approval button added');
-      }
-    }
-    
-    // Test EmailJS function
-    function testEmailJS() {
-      console.log('🧪 Testing EmailJS directly...');
-      
-      // Use email field as recipient
-      const testData = {
-        name: 'Debug Test User',
-        user_email: 'test@example.com',
-        company: 'Test Company',
-        use_case: 'Debugging',
-        details: 'This is a test email',
-        registered_at: new Date().toLocaleString(),
-        approval_code: 'TEST123',
-        email: "451jscholz@gmail.com"  // Correct recipient field
-      };
-      
-      console.log('📧 Test data:', testData);
-      
-      emailjs.send("service_ka4cdgv", "template_9gek504", testData).then(function(response) {
-        console.log('✅ TEST EmailJS sent!', response.status, response.text);
-        alert('✅ Test email sent successfully! Check your Gmail.');
-      }, function(error) {
-        console.log('❌ TEST EmailJS failed:', error);
-        console.log('🔍 Full error:', JSON.stringify(error, null, 2));
-        alert(`❌ Test failed: ${error.text || JSON.stringify(error)}`);
-      });
-    }
-    
-    // Approve user with code
-    function approveWithCode(code) {
-      // For demo, any 6-character code works
-      if (code && code.length === 6) {
-        const session = Auth.session;
-        if (session) {
-          session.approved = true;
-          Auth.session = session;
-          
-          // Show success message
-          const banner = document.getElementById('banner') || document.createElement('div');
-          banner.id = 'banner';
-          banner.className = 'banner';
-          banner.style.display = 'block';
-          banner.style.background = '#065f46';
-          banner.style.borderColor = '#065f46';
-          banner.innerHTML = `
-            <strong>✅ User Approved!</strong><br>
-            ${session.email} now has full access to all features.
-          `;
-          
-          if (!document.getElementById('banner')) {
-            document.querySelector('.wrap').insertBefore(banner, document.querySelector('.card'));
-          }
-          
-          // Remove approval button
-          const approveBtn = document.querySelector('button[onclick*="approveWithCode"]');
-          if (approveBtn) approveBtn.remove();
-          
-          // Update UI
-          Auth.showUserInfo();
-          Auth.updateUsageDisplay();
-          
-          console.log('✅ User approved with code:', code);
-        }
-      }
-    }
-    
-    // Show registration form for full access
-    function showRegistrationForm() {
-      // Hide any existing banners
-      const existingBanner = document.getElementById('banner');
-      if (existingBanner) {
-        existingBanner.style.display = 'none';
-      }
-      
-      // Create registration modal
-      const regModal = document.createElement('div');
-      regModal.className = 'login-overlay';
-      regModal.id = 'registrationModal';
-      regModal.innerHTML = `
-        <div class="login-modal">
-          <h2 class="login-title">Register for Full Access</h2>
-          <p class="login-sub">Complete your registration to unlock all premium features</p>
-          
-          <div class="login-field">
-            <label for="regName">Full Name</label>
-            <input id="regName" type="text" placeholder="John Doe" />
-          </div>
-          
-          <div class="login-field">
-            <label for="regCompany">Company/Organization (Optional)</label>
-            <input id="regCompany" type="text" placeholder="Acme Corp" />
-          </div>
-          
-          <div class="login-field">
-            <label for="regUseCase">Intended Use</label>
-            <select id="regUseCase">
-              <option value="">Please select...</option>
-              <option value="personal">Personal Investing</option>
-              <option value="research">Market Research</option>
-              <option value="trading">Day Trading</option>
-              <option value="business">Business Analysis</option>
-              <option value="education">Educational Purpose</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-          
-          <div class="login-field">
-            <label for="regDetails">Additional Details</label>
-            <textarea id="regDetails" placeholder="Tell us briefly how you plan to use the tool..." 
-                      style="width: 100%; min-height: 80px; background: #0b1220; color: var(--text); 
-                             border: 1px solid var(--pill); border-radius: 10px; padding: 10px; 
-                             resize: vertical; font-family: inherit;"></textarea>
-          </div>
-          
-          <div class="login-actions">
-            <button id="btnSubmitRegistration">Submit Registration</button>
-            <button id="btnCancelRegistration" class="ghost">Cancel</button>
-          </div>
-          
-          <div id="registrationStatus" class="status sub" style="margin-top:16px"></div>
-        </div>
-      `;
-      
-      document.body.appendChild(regModal);
-      
-      // Add event listeners
-      document.getElementById('btnSubmitRegistration').addEventListener('click', submitRegistration);
-      document.getElementById('btnCancelRegistration').addEventListener('click', hideRegistrationForm);
-      
-      // Pre-fill email if logged in
-      const session = Auth.session;
-      if (session && session.email) {
-        const emailField = document.createElement('div');
-        emailField.className = 'login-field';
-        emailField.innerHTML = `
-          <label>Registered Email</label>
-          <input type="email" value="${session.email}" disabled style="opacity: 0.7;" />
-        `;
-        regModal.querySelector('.login-modal').insertBefore(
-          emailField, 
-          regModal.querySelector('#regName').parentElement
-        );
-        
-        // Validate that the stored email is still valid
-        if (!isValidEmail(session.email)) {
-          const statusDiv = document.getElementById('registrationStatus');
-          statusDiv.textContent = 'Warning: Invalid email format in session';
-          statusDiv.style.color = '#f59e0b';
-        }
-      }
-    }
-    
-    // Hide registration form
-    function hideRegistrationForm() {
-      const regModal = document.getElementById('registrationModal');
-      if (regModal) {
-        regModal.remove();
-      }
-    }
-    
-    // Submit registration for approval
-    function submitRegistration() {
-      const name = document.getElementById('regName').value.trim();
-      const company = document.getElementById('regCompany').value.trim();
-      const useCase = document.getElementById('regUseCase').value;
-      const details = document.getElementById('regDetails').value.trim();
-      const statusDiv = document.getElementById('registrationStatus');
-      
-      if (!name) {
-        statusDiv.textContent = 'Please enter your full name';
-        statusDiv.style.color = '#fbbf24';
-        return;
-      }
-      
-      if (!useCase) {
-        statusDiv.textContent = 'Please select your intended use';
-        statusDiv.style.color = '#fbbf24';
-        return;
-      }
-      
-      // Validate the session email
-      const session = Auth.session;
-      if (!session || !session.email || !isValidEmail(session.email)) {
-        statusDiv.textContent = 'Invalid or missing email address. Please log out and log back in with a valid email.';
-        statusDiv.style.color = '#f87171';
-        return;
-      }
-      
-      statusDiv.textContent = 'Submitting registration...';
-      statusDiv.style.color = '#cbd5e1';
-      
-      // Prepare registration data
-      const registrationData = {
-        email: session.email,
-        name: name,
-        company: company,
-        useCase: useCase,
-        details: details,
-        registeredAt: new Date().toISOString()
-      };
-      
-      console.log('Registration data:', registrationData);
-      
-      // Simulate registration submission
-      setTimeout(() => {
-        // Option 1: EmailJS (No backend required - RECOMMENDED)
-        console.log('🔍 Sending EmailJS notification...');
-        console.log('Service ID: service_ka4cdgv');
-        console.log('Template ID: template_t964p3h');
-        console.log('To email: 451jscholz@gmail.com');
-        console.log('Registration data:', {
-          name: name,
-          email: session.email,
-          company: company,
-          use_case: useCase,
-          details: details,
-          registered_at: new Date().toLocaleString()
-        });
-        
-        // Create simple approval code (no links needed)
-        const approvalCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-        console.log('🔑 Generated approval code:', approvalCode);
-        console.log('👤 User email:', session.email);
-        console.log('📧 Sending to: 451jscholz@gmail.com');
-        
-        // Debug: Check EmailJS is initialized
-        // Debug: Test EmailJS init
-        try {
-          console.log('🔍 Testing EmailJS before send...');
-          if (typeof emailjs === 'undefined') {
-            throw new Error('EmailJS not loaded');
-          }
-          if (!emailjs.send) {
-            throw new Error('EmailJS.send method not available');
-          }
-          console.log('✅ EmailJS appears to be working');
-        } catch (e) {
-          console.error('❌ EmailJS initialization error:', e);
-          statusDiv.innerHTML = `
-            <strong>❌ EmailJS Error</strong><br>
-            ${e.message}<br>
-            <small>Please refresh the page and try again.</small>
-          `;
-          statusDiv.style.color = '#f87171';
-          return;
-        }
-        
-        console.log('🚀 Sending EmailJS request now...');
-        
-        // Prepare email data (set recipient to YOUR email)
-        const emailData = {
-          name: name,
-          user_email: session.email,  // User's email (for display)
-          company: company,
-          use_case: useCase,
-          details: details,
-          registered_at: new Date().toLocaleString(),
-          approval_code: approvalCode,
-          email: "451jscholz@gmail.com"  // YOUR email as recipient
-        };
-        
-        console.log('📧 Email data being sent:', emailData);
-        
-        emailjs.send("service_ka4cdgv", "template_9gek504", emailData).then(function(response) {
-          console.log('✅ Email notification sent!', response.status, response.text);
-          console.log('📧 Response details:', response);
-          statusDiv.innerHTML = `
-            <strong>✅ Registration Submitted!</strong><br>
-            Your registration has been received and is pending review.<br>
-            <small>You'll be notified via email once approved (typically within 24 hours).</small>
-          `;
-          statusDiv.style.color = '#34d399';
-        }, function(error) {
-          console.log('❌ EmailJS failed:', error);
-          console.log('🔍 Full error object:', JSON.stringify(error, null, 2));
-          console.log('🔍 Error status:', error.status);
-          console.log('🔍 Error text:', error.text);
-          console.log('🔍 Error type:', typeof error);
-          console.log('🔍 Error keys:', Object.keys(error));
-          
-          // Try to extract more error info
-          let errorMessage = 'Unknown error occurred';
-          if (error.text) {
-            errorMessage = error.text;
-          } else if (error.message) {
-            errorMessage = error.message;
-          } else if (typeof error === 'string') {
-            errorMessage = error;
-          }
-          
-          statusDiv.innerHTML = `
-            <strong>⚠️ Registration Submitted!</strong><br>
-            Your registration was received but email notification failed.<br>
-            <small>Error: ${errorMessage}</small><br>
-            <small>Check browser console (F12) for details.</small>
-          `;
-          statusDiv.style.color = '#fbbf24';
-        });
-        
-        // Option 2: Discord webhook (No backend required)
-        // fetch('YOUR_DISCORD_WEBHOOK_URL', {
-        //   method: 'POST',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify({
-        //     embeds: [{
-        //       title: "🔔 New Registration Request",
-        //       color: 5814783,
-        //       fields: [
-        //         { name: "Name", value: name },
-        //         { name: "Email", value: session.email },
-        //         { name: "Company", value: company || 'Not provided' },
-        //         { name: "Use Case", value: useCase },
-        //         { name: "Details", value: details || 'Not provided' }
-        //       ],
-        //       timestamp: new Date().toISOString()
-        //     }]
-        //   })
-        // });
-        
-        // Option 3: Google Forms (Free, no backend)
-        // const formData = new FormData();
-        // formData.append('entry.123456789', name);
-        // formData.append('entry.234567890', session.email);
-        // formData.append('entry.345678901', company);
-        // formData.append('entry.456789012', useCase);
-        // formData.append('entry.567890123', details);
-        // 
-        // fetch('YOUR_GOOGLE_FORM_URL', {
-        //   method: 'POST',
-        //   body: formData
-        // });
-        
-        // Option 4: Tally.so (Free form service)
-        // fetch('https://tally.so/r/w5L3D9', {
-        //   method: 'POST',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify({
-        //     name: name,
-        //     email: session.email,
-        //     company: company,
-        //     useCase: useCase,
-        //     details: details
-        //   })
-        // });
-        
-        // Hide form after 3 seconds
-        setTimeout(() => {
-          hideRegistrationForm();
-          // Show confirmation banner
-          const confirmBanner = document.createElement('div');
-          confirmBanner.id = 'banner';
-          confirmBanner.className = 'banner';
-          confirmBanner.style.display = 'block';
-          confirmBanner.style.background = '#065f46';
-          confirmBanner.style.borderColor = '#065f46';
-          confirmBanner.innerHTML = `
-            <strong>📋 Registration Pending Approval</strong><br>
-            Your request for full access has been submitted. We'll review it and email you once approved.
-            <br><small>Current: Trial Account (5 requests/day) → Pending: Full Access (100 requests/day)</small>
-          `;
-          
-          document.querySelector('.wrap').insertBefore(confirmBanner, document.querySelector('.card'));
-        }, 3000);
-      }, 1500);
     }
 
     function decodeEntities(str) {
@@ -1138,7 +544,7 @@
 
     /* ================== Summarize & clean display ================== */
     async function summarizeItem(it, box, btn) {
-      if (!Auth.requireApproval('Article Summarization')) return;
+      if (!requireAuth()) return;
       if (!Auth.checkUsageLimit()) {
         box.className = 'summary-box';
         box.textContent = 'Daily usage limit reached. Please upgrade your plan.';
@@ -1257,7 +663,7 @@
     let currentTrendingData = [];
 
     async function loadTrending(){
-      if (!Auth.requireApproval('Reddit Trending Data')) return;
+      if (!requireAuth()) return;
       if (!Auth.checkUsageLimit()) {
         $('#trendStatus').textContent = 'Daily usage limit reached. Please upgrade your plan.';
         return;
@@ -1382,7 +788,6 @@
           break;
       }
 
-      // Desktop header (hidden on mobile)
       host.append(el('div',{className:'trend-grid trend-header'},
         el('div',{},'#'),
         el('div',{},'Ticker'),
@@ -1391,17 +796,14 @@
         el('div',{},'Upvotes'),
         el('div',{},'Action')
       ));
-      
-      // Mobile header (hidden on desktop)
-      host.append(el('div',{className:'mobile-trend-header'}, '📈 Trending Tickers'));
 
       sortedRows.forEach(r=>{
         const row = el('div',{className:'trend-row'},
-          el('div',{'data-label':'Rank:'}, String(r.rank ?? '')),
-          el('div',{'data-label':'Ticker:'}, String(r.ticker ?? '')),
-          el('div',{'data-label':'Name:'}, String(r.name ?? '')),
-          el('div',{'data-label':'Mentions:'}, String(r.mentions ?? '')),
-          el('div',{'data-label':'Upvotes:'}, String(r.upvotes ?? '')),
+          el('div',{}, String(r.rank ?? '')),
+          el('div',{}, String(r.ticker ?? '')),
+          el('div',{}, String(r.name ?? '')),
+          el('div',{}, String(r.mentions ?? '')),
+          el('div',{}, String(r.upvotes ?? '')),
           el('div',{className:'trend-actions'},
             el('button',{className:'ghost',onclick:()=>{ $('#ticker').value = (r.ticker||'').toUpperCase(); startSearch(); }},'Open News')
           )
@@ -1432,7 +834,7 @@
     function setKeyPill(text, ok){ const p = $('#pillKey'); p.textContent = text; p.classList.remove('ok','err'); p.classList.add(ok? 'ok':'err'); }
 
     async function startSearch(){
-      if (!Auth.requireApproval('Stock News Search')) return;
+      if (!requireAuth()) return;
       if (!Auth.checkUsageLimit()) {
         setStatus('Daily usage limit reached. Please upgrade your plan.');
         return;
@@ -1461,72 +863,10 @@
     function cancelSearch(){ inflight.forEach(c=>c.abort()); inflight=[]; setStatus('Canceled.'); $('#btnStart').disabled=false; $('#btnCancel').disabled=true; $('#spin').style.display='none'; log('Canceled current requests.','warntxt'); }
 
     (function init(){
-      // Handle approval/reject from email links
-      const urlParams = new URLSearchParams(window.location.search);
-      const approveEmail = urlParams.get('approve');
-      const rejectEmail = urlParams.get('reject');
-      
-      if (approveEmail) {
-        // Auto-approve user from email link
-        const approvedSession = {
-          email: approveEmail,
-          token: 'approved-token-' + Date.now(),
-          expiresAt: Date.now() + (24 * 60 * 60 * 1000),
-          userId: 'approved-user',
-          approved: true,
-          registeredAt: Date.now()
-        };
-        
-        Auth.session = approvedSession;
-        
-        // Show approval success message
-        const banner = document.createElement('div');
-        banner.id = 'banner';
-        banner.className = 'banner';
-        banner.style.display = 'block';
-        banner.style.background = '#065f46';
-        banner.style.borderColor = '#065f46';
-        banner.innerHTML = `
-          <strong>✅ User Approved Successfully!</strong><br>
-          ${approveEmail} now has full access to all features.
-          <br><small>You can now log out or continue using the app.</small>
-        `;
-        
-        document.querySelector('.wrap').insertBefore(banner, document.querySelector('.card'));
-        
-        // Clean URL
-        window.history.replaceState({}, document.title, window.location.pathname);
-        
-        console.log('✅ Auto-approved user:', approveEmail);
-      }
-      
-      if (rejectEmail) {
-        // Show rejection message
-        const banner = document.createElement('div');
-        banner.id = 'banner';
-        banner.className = 'banner';
-        banner.style.display = 'block';
-        banner.style.background = '#7f1d1d';
-        banner.style.borderColor = '#7f1d1d';
-        banner.innerHTML = `
-          <strong>❌ User Rejected</strong><br>
-          ${rejectEmail} has been rejected and will remain in trial mode.
-          <br><small>No further action needed.</small>
-        `;
-        
-        document.querySelector('.wrap').insertBefore(banner, document.querySelector('.card'));
-        
-        // Clean URL
-        window.history.replaceState({}, document.title, window.location.pathname);
-        
-        console.log('❌ Rejected user:', rejectEmail);
-      }
-      
       // Initialize authentication
       if (Auth.isLoggedIn()) {
         Auth.hideLogin();
         Auth.showUserInfo();
-        addApprovalButton(); // Add demo approval button
       } else {
         Auth.showLogin();
       }
@@ -1544,36 +884,11 @@
       // Authentication event listeners
       $('#btnLogin').addEventListener('click', loginUser);
       $('#btnRegister').addEventListener('click', registerUser);
-      $('#btnLogout').addEventListener('click', () => {
-        Auth.logout();
-        // Remove approval button on logout
-        const approveBtn = document.querySelector('button[onclick*="approveUser"]');
-        if (approveBtn) approveBtn.remove();
-      });
+      $('#btnLogout').addEventListener('click', Auth.logout.bind(Auth));
       
       // Handle Enter key in login fields
       $('#loginPassword').addEventListener('keydown',(e)=>{ if(e.key==='Enter') loginUser(); });
       $('#loginEmail').addEventListener('keydown',(e)=>{ if(e.key==='Enter') loginUser(); });
-      
-      // Real-time email validation
-      $('#loginEmail').addEventListener('input', function() {
-        const email = this.value.trim();
-        if (email && !isValidEmail(email)) {
-          this.style.borderColor = '#f59e0b';
-          setLoginStatus('Please enter a valid email address');
-        } else if (email && isValidEmail(email)) {
-          this.style.borderColor = 'var(--ok)';
-          setLoginStatus('');
-        } else {
-          this.style.borderColor = 'var(--pill)';
-          setLoginStatus('');
-        }
-      });
-      
-      // Clear validation on focus
-      $('#loginEmail').addEventListener('focus', function() {
-        this.style.borderColor = 'var(--accent)';
-      });
 
       ['sort','dedupe','maxResults','daysBack'].forEach(id=>{
         document.getElementById(id).addEventListener('change',()=>{
