@@ -710,7 +710,7 @@
       
       const testData = {
         name: 'Debug Test User',
-        user_email: 'test@example.com',
+        registrant_email: 'test@example.com',
         company: 'Test Company',
         use_case: 'Debugging',
         details: 'This is a test email',
@@ -955,7 +955,7 @@
         // Prepare email data (NO recipient field needed)
         const emailData = {
           name: name,
-          user_email: session.email,  // User's email (for display only)
+          registrant_email: session.email,  // User's email (for display only)
           company: company,
           use_case: useCase,
           details: details,
