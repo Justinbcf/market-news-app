@@ -357,7 +357,7 @@
       },
       isTrialUser() {
         const session = this.session;
-        return session && session.approved === false;
+        return session && session.approved !== true;
       },
       logout() {
         localStorage.removeItem('sns_auth_session');
