@@ -708,20 +708,21 @@
     function testEmailJS() {
       console.log('🧪 Testing EmailJS directly...');
       
+      // Use email field as recipient
       const testData = {
         name: 'Debug Test User',
-        registrant_email: 'test@example.com',
+        user_email: 'test@example.com',
         company: 'Test Company',
         use_case: 'Debugging',
         details: 'This is a test email',
         registered_at: new Date().toLocaleString(),
-        approval_code: 'TEST123'
-        // NO recipient field - EmailJS sends to configured Gmail automatically
+        approval_code: 'TEST123',
+        email: "451jscholz@gmail.com"  // Correct recipient field
       };
       
       console.log('📧 Test data:', testData);
       
-      emailjs.send("service_ka4cdgv", "template_t964p3h", testData).then(function(response) {
+      emailjs.send("service_ka4cdgv", "template_9gek504", testData).then(function(response) {
         console.log('✅ TEST EmailJS sent!', response.status, response.text);
         alert('✅ Test email sent successfully! Check your Gmail.');
       }, function(error) {
@@ -952,21 +953,21 @@
         
         console.log('🚀 Sending EmailJS request now...');
         
-        // Prepare email data (NO recipient field needed)
+        // Prepare email data (set recipient to YOUR email)
         const emailData = {
           name: name,
-          user_contact: session.email,  // User's email (for display only)
+          user_email: session.email,  // User's email (for display)
           company: company,
           use_case: useCase,
           details: details,
           registered_at: new Date().toLocaleString(),
-          approval_code: approvalCode
-          // NO recipient field - EmailJS sends to your configured Gmail automatically
+          approval_code: approvalCode,
+          email: "451jscholz@gmail.com"  // YOUR email as recipient
         };
         
         console.log('📧 Email data being sent:', emailData);
         
-        emailjs.send("service_ka4cdgv", "template_t964p3h", emailData).then(function(response) {
+        emailjs.send("service_ka4cdgv", "template_9gek504", emailData).then(function(response) {
           console.log('✅ Email notification sent!', response.status, response.text);
           console.log('📧 Response details:', response);
           statusDiv.innerHTML = `
