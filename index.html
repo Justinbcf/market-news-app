@@ -126,6 +126,34 @@
       .login-title{font-size:20px}
       .user-info{flex-direction:column;align-items:flex-start;gap:8px}
       .usage-info{margin-bottom:8px}
+      
+      /* Mobile AI Analysis Styles */
+      .summary-box{padding:12px;border-radius:12px}
+      .summary-title{font-size:14px;margin-top:8px}
+      .summary-text{font-size:13px;line-height:1.5;margin:8px 0}
+      .summary-list{margin:8px 0 0 12px;font-size:12px}
+      .summary-list li{margin-bottom:4px}
+      
+      /* Mobile Price Display */
+      .price-display-mobile{padding:10px;border-radius:8px;margin:8px 0}
+      .price-row-mobile{font-size:16px;margin-bottom:6px}
+      .price-change-mobile{font-size:12px}
+      .volume-row-mobile{font-size:11px}
+      
+      /* Mobile Pills and Chips */
+      .pill{font-size:11px;padding:2px 8px}
+      .chip{font-size:10px;padding:2px 6px}
+      .chips{gap:4px}
+      
+      /* Mobile Sentiment Display */
+      .sentiment-section-mobile{margin:8px 0;padding:8px;border-radius:6px}
+      .sentiment-label-mobile{font-size:12px;font-weight:600}
+      .sentiment-value-mobile{font-size:11px}
+      
+      /* Mobile Investment Thesis */
+      .investment-section-mobile{margin:8px 0;padding:8px;background:rgba(34,211,238,.05);border-radius:6px;border:1px solid rgba(34,211,238,.1)}
+      .investment-title-mobile{font-size:12px;color:#22d3ee;margin-bottom:4px}
+      .investment-text-mobile{font-size:11px;line-height:1.4}
     }
     
     @media (max-width: 480px) {
@@ -134,6 +162,34 @@
       .card{padding:8px;border-radius:8px}
       .trend-grid,.trend-row{grid-template-columns:40px 60px 1fr 60px 40px;font-size:10px}
       .login-modal{margin:12px;padding:16px}
+      
+      /* Small Mobile AI Analysis */
+      .summary-box{padding:10px;border-radius:10px}
+      .summary-title{font-size:13px;margin-top:6px}
+      .summary-text{font-size:12px;line-height:1.4;margin:6px 0}
+      .summary-list{margin:6px 0 0 10px;font-size:11px}
+      .summary-list li{margin-bottom:3px}
+      
+      /* Small Mobile Price Display */
+      .price-display-mobile{padding:8px;border-radius:6px;margin:6px 0}
+      .price-row-mobile{font-size:15px;margin-bottom:4px}
+      .price-change-mobile{font-size:11px}
+      .volume-row-mobile{font-size:10px}
+      
+      /* Small Mobile Pills and Chips */
+      .pill{font-size:10px;padding:1px 6px}
+      .chip{font-size:9px;padding:1px 4px}
+      .chips{gap:3px}
+      
+      /* Small Mobile Sentiment */
+      .sentiment-section-mobile{margin:6px 0;padding:6px;border-radius:4px}
+      .sentiment-label-mobile{font-size:11px}
+      .sentiment-value-mobile{font-size:10px}
+      
+      /* Small Mobile Investment */
+      .investment-section-mobile{margin:6px 0;padding:6px;border-radius:4px}
+      .investment-title-mobile{font-size:11px;margin-bottom:3px}
+      .investment-text-mobile{font-size:10px;line-height:1.3}
       .login-actions{flex-direction:column}
       .login-actions button{margin-bottom:8px}
     }
@@ -1251,19 +1307,12 @@ MARKET IMPACT ANALYSIS, NOT NEWS DESCRIPTION!`
         
         // Add price data to analysis if available
         const ticker = extractTicker(it.title, it.description);
-        console.log('Extracted ticker:', ticker);
-        console.log('Title:', it.title);
-        console.log('Description:', it.description);
         
         if (ticker) {
           const priceData = await getStockPrice(ticker);
-          console.log('Price data fetched:', priceData);
           if (priceData) {
             aiAnalysis.priceData = priceData;
-            console.log('Price data attached to aiAnalysis');
           }
-        } else {
-          console.log('No ticker found in this article');
         }
         
         const aiSentiment = await analyzeSentimentWithAI(it.title);
@@ -1279,31 +1328,35 @@ MARKET IMPACT ANALYSIS, NOT NEWS DESCRIPTION!`
         
         // Real-time Price Display (if available)
         let priceDisplay = null;
-        console.log('Checking for price data in aiAnalysis:', aiAnalysis.priceData);
         
         if (aiAnalysis.priceData) {
-          console.log('Creating price display...');
           const { currentPrice, change, changePercent, volume, avgVolume } = aiAnalysis.priceData;
           const changeColor = change >= 0 ? '#22c55e' : '#ef4444';
           const changeSymbol = change >= 0 ? '+' : '';
           
           priceDisplay = el('div', { 
+            className:'price-display-mobile',
             style:'background: linear-gradient(135deg, rgba(34,211,238,.08), rgba(168,85,247,.08)); padding:12px; border-radius:8px; margin:8px 0; border:1px solid rgba(34,211,238,.2);'
           });
           
           priceDisplay.append(
-            el('div', { style:'display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;' }, 
+            el('div', { 
+              className:'price-row-mobile',
+              style:'display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;' 
+            }, 
               el('span', { style:'font-size:18px; font-weight:bold; color: #22d3ee;' }, `$${currentPrice.toFixed(2)}`),
-              el('span', { style:'font-size:14px; color: changeColor; font-weight:bold;' }, `${changeSymbol}${change.toFixed(2)} (${changeSymbol}${changePercent.toFixed(2)}%)`)
+              el('span', { 
+                className:'price-change-mobile',
+                style:'font-size:14px; color: changeColor; font-weight:bold; white-space:nowrap;' 
+              }, `${changeSymbol}${change.toFixed(2)} (${changeSymbol}${changePercent.toFixed(2)}%)`)
             ),
-            el('div', { style:'font-size:12px; color: #94a3b8;' }, 
+            el('div', { 
+              className:'volume-row-mobile',
+              style:'font-size:12px; color: #94a3b8; word-break: break-all;' 
+            }, 
               `Volume: ${volume?.toLocaleString() || 'N/A'} | Avg: ${avgVolume?.toLocaleString() || 'N/A'}`
             )
           );
-          
-          console.log('Price display created successfully');
-        } else {
-          console.log('No price data available - price display will not be shown');
         }
         
         // AI Summary
@@ -1324,8 +1377,11 @@ MARKET IMPACT ANALYSIS, NOT NEWS DESCRIPTION!`
         }
 
         // Investment Thesis
-        const investmentTitle = aiAnalysis.investment_thesis ? el('div', { className:'summary-title' }, '🎯 Investment Thesis') : null;
-        const investmentText = aiAnalysis.investment_thesis ? el('div', { style:'background: rgba(34,197,94,.08); padding:8px; border-left:3px solid #22c55e; margin:8px 0; font-size:13px;' }, aiAnalysis.investment_thesis) : null;
+        const investmentTitle = aiAnalysis.investment_thesis ? el('div', { className:'summary-title' }, '💰 Investment Thesis') : null;
+        const investmentText = aiAnalysis.investment_thesis ? el('div', { 
+          className:'investment-section-mobile',
+          style:'background: rgba(34,197,94,.08); padding:8px; border-left:3px solid #22c55e; margin:8px 0; font-size:13px; border-radius:4px;' 
+        }, aiAnalysis.investment_thesis) : null;
 
         // Ripple Effects
         const rippleTitle = aiAnalysis.ripple_effects?.length ? el('div', { className:'summary-title' }, '🌊 Ripple Effects') : null;
@@ -1335,15 +1391,27 @@ MARKET IMPACT ANALYSIS, NOT NEWS DESCRIPTION!`
         }
 
         // Enhanced AI Sentiment Display
-        const sentimentSection = el('div', { style:'background: rgba(34,211,238,.08); padding:8px; border-radius:6px; margin:8px 0;' });
-        sentimentSection.append(el('div', { style:'font-weight:bold; margin-bottom:4px;' }, '🧠 Market Sentiment Analysis'));
+        const sentimentSection = el('div', { 
+          className:'sentiment-section-mobile',
+          style:'background: rgba(34,211,238,.08); padding:8px; border-radius:6px; margin:8px 0;' 
+        });
+        sentimentSection.append(el('div', { 
+          className:'sentiment-label-mobile',
+          style:'font-weight:bold; margin-bottom:4px; font-size:13px;' 
+        }, '🧠 Market Sentiment'));
+        
+        const sentimentRow = el('div', { style:'display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px;' });
         const sentimentBadge = el('span', { 
           className: `chip ${aiSentiment.sentiment === 'bullish' ? 'bull' : aiSentiment.sentiment === 'bearish' ? 'bear' : 'neutral'}` 
         }, `${aiSentiment.sentiment.toUpperCase()} (${Math.round(aiSentiment.confidence * 100)}%)`);
-        sentimentSection.append(sentimentBadge);
+        sentimentRow.append(sentimentBadge);
+        sentimentSection.append(sentimentRow);
         
         if (aiSentiment.reasoning) {
-          sentimentSection.append(el('div', { style:'margin-top:6px; font-size:12px; color: var(--muted);' }, aiSentiment.reasoning));
+          sentimentSection.append(el('div', { 
+            className:'sentiment-value-mobile',
+            style:'margin-top:6px; font-size:12px; color: var(--muted); line-height:1.4;' 
+          }, aiSentiment.reasoning));
         }
 
         // Key Factors
