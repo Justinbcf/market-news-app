@@ -779,7 +779,7 @@ MARKET IMPACT ANALYSIS, NOT NEWS DESCRIPTION!`
         console.log('Fetching price for ticker:', ticker);
         
         // Using a CORS-friendly proxy for Yahoo Finance API
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1y`)}`;
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}`)}`;
         const response = await fetch(proxyUrl);
         
         if (!response.ok) {
@@ -807,14 +807,13 @@ MARKET IMPACT ANALYSIS, NOT NEWS DESCRIPTION!`
         const change = currentPrice - previousClose;
         const changePercent = (change / previousClose) * 100;
         
-        // Get price data for technical analysis
+        // Get 50-day and 200-day moving averages if available
         const indicators = chart.indicators;
         const quote = indicators?.quote?.[0];
         const prices = quote?.close?.filter(p => p !== null) || [];
-        const volumes = quote?.volume?.filter(v => v !== null) || [];
         
-        // Calculate technical indicators
-        const technicalIndicators = calculateTechnicalIndicators(prices, volumes);
+        const sma50 = prices.length >= 50 ? prices.slice(-50).reduce((a, b) => a + b) / 50 : null;
+        const sma200 = prices.length >= 200 ? prices.slice(-200).reduce((a, b) => a + b) / 200 : null;
         
         const result = {
           ticker,
@@ -822,9 +821,10 @@ MARKET IMPACT ANALYSIS, NOT NEWS DESCRIPTION!`
           previousClose,
           change,
           changePercent,
+          sma50,
+          sma200,
           volume: chart.meta?.regularMarketVolume,
-          avgVolume: chart.meta?.averageDailyVolume3Month,
-          ...technicalIndicators
+          avgVolume: chart.meta?.averageDailyVolume3Month
         };
         
         console.log('Price data fetched successfully:', result);
@@ -836,158 +836,7 @@ MARKET IMPACT ANALYSIS, NOT NEWS DESCRIPTION!`
       }
     }
     
-    // Calculate comprehensive technical indicators
-    function calculateTechnicalIndicators(prices, volumes) {
-      if (prices.length < 20) {
-        return { sma20: null, sma50: null, sma200: null, rsi: null, macd: null, signal: null, histogram: null };
-      }
-      
-      // Simple Moving Averages
-      const sma20 = calculateSMA(prices, 20);
-      const sma50 = calculateSMA(prices, 50);
-      const sma200 = calculateSMA(prices, 200);
-      
-      // RSI (14-period)
-      const rsi = calculateRSI(prices, 14);
-      
-      // MACD (12, 26, 9)
-      const macdData = calculateMACD(prices, 12, 26, 9);
-      
-      // Volume Analysis
-      const volumeAnalysis = analyzeVolume(volumes);
-      
-      // Trend Analysis
-      const trendAnalysis = analyzeTrend(prices, sma20, sma50, sma200);
-      
-      return {
-        sma20, sma50, sma200,
-        rsi,
-        macd: macdData.macd,
-        signal: macdData.signal,
-        histogram: macdData.histogram,
-        ...volumeAnalysis,
-        ...trendAnalysis
-      };
-    }
-    
-    // Calculate Simple Moving Average
-    function calculateSMA(prices, period) {
-      if (prices.length < period) return null;
-      const recent = prices.slice(-period);
-      return recent.reduce((a, b) => a + b) / recent.length;
-    }
-    
-    // Calculate RSI
-    function calculateRSI(prices, period = 14) {
-      if (prices.length < period + 1) return null;
-      
-      const changes = [];
-      for (let i = 1; i < prices.length; i++) {
-        changes.push(prices[i] - prices[i - 1]);
-      }
-      
-      const recentChanges = changes.slice(-period);
-      const gains = recentChanges.filter(change => change > 0);
-      const losses = recentChanges.filter(change => change < 0).map(loss => Math.abs(loss));
-      
-      const avgGain = gains.length > 0 ? gains.reduce((a, b) => a + b) / period : 0;
-      const avgLoss = losses.length > 0 ? losses.reduce((a, b) => a + b) / period : 0;
-      
-      if (avgLoss === 0) return 100;
-      
-      const rs = avgGain / avgLoss;
-      return 100 - (100 / (1 + rs));
-    }
-    
-    // Calculate MACD
-    function calculateMACD(prices, fastPeriod = 12, slowPeriod = 26, signalPeriod = 9) {
-      if (prices.length < slowPeriod + signalPeriod) {
-        return { macd: null, signal: null, histogram: null };
-      }
-      
-      const ema12 = calculateEMA(prices, fastPeriod);
-      const ema26 = calculateEMA(prices, slowPeriod);
-      const macd = ema12 - ema26;
-      
-      // For simplicity, using recent MACD values for signal line
-      const macdHistory = [];
-      for (let i = slowPeriod; i < prices.length; i++) {
-        const ema12 = calculateEMA(prices.slice(0, i + 1), fastPeriod);
-        const ema26 = calculateEMA(prices.slice(0, i + 1), slowPeriod);
-        macdHistory.push(ema12 - ema26);
-      }
-      
-      const signal = calculateSMA(macdHistory, signalPeriod);
-      const histogram = macd - signal;
-      
-      return { macd, signal, histogram };
-    }
-    
-    // Calculate Exponential Moving Average
-    function calculateEMA(prices, period) {
-      if (prices.length < period) return null;
-      
-      const multiplier = 2 / (period + 1);
-      let ema = prices[0];
-      
-      for (let i = 1; i < prices.length; i++) {
-        ema = (prices[i] * multiplier) + (ema * (1 - multiplier));
-      }
-      
-      return ema;
-    }
-    
-    // Analyze volume patterns
-    function analyzeVolume(volumes) {
-      if (volumes.length < 10) {
-        return { volumeSignal: 'NEUTRAL', volumeRatio: 1 };
-      }
-      
-      const recentVolume = volumes.slice(-5);
-      const avgRecentVolume = recentVolume.reduce((a, b) => a + b) / recentVolume.length;
-      const historicalAvgVolume = volumes.slice(-20).reduce((a, b) => a + b) / 20;
-      
-      const volumeRatio = avgRecentVolume / historicalAvgVolume;
-      let volumeSignal = 'NEUTRAL';
-      
-      if (volumeRatio > 1.5) volumeSignal = 'HIGH';
-      else if (volumeRatio > 1.2) volumeSignal = 'ABOVE_AVERAGE';
-      else if (volumeRatio < 0.7) volumeSignal = 'LOW';
-      
-      return { volumeSignal, volumeRatio };
-    }
-    
-    // Analyze trend based on moving averages
-    function analyzeTrend(prices, sma20, sma50, sma200) {
-      const currentPrice = prices[prices.length - 1];
-      let trend = 'NEUTRAL';
-      let strength = 0;
-      
-      if (sma20 && sma50 && sma200) {
-        if (currentPrice > sma20 && sma20 > sma50 && sma50 > sma200) {
-          trend = 'STRONG_UPTREND';
-          strength = 3;
-        } else if (currentPrice > sma20 && sma20 > sma50) {
-          trend = 'UPTREND';
-          strength = 2;
-        } else if (currentPrice < sma20 && sma20 < sma50 && sma50 < sma200) {
-          trend = 'STRONG_DOWNTREND';
-          strength = -3;
-        } else if (currentPrice < sma20 && sma20 < sma50) {
-          trend = 'DOWNTREND';
-          strength = -2;
-        } else if (currentPrice > sma20 && currentPrice < sma50) {
-          trend = 'CONSOLIDATION_UP';
-          strength = 1;
-        } else if (currentPrice < sma20 && currentPrice > sma50) {
-          trend = 'CONSOLIDATION_DOWN';
-          strength = -1;
-        }
-      }
-      
-      return { trend, trendStrength: strength };
-    }
-    
+        
     // Fallback price data for demonstration (mock data)
     function getFallbackPriceData(ticker) {
       console.log('Using fallback price data for:', ticker);
@@ -1015,30 +864,16 @@ MARKET IMPACT ANALYSIS, NOT NEWS DESCRIPTION!`
       const change = mockData.change;
       const changePercent = (change / (currentPrice - change)) * 100;
       
-      // Generate realistic mock technical indicators
-      const mockTechnical = {
-        sma20: currentPrice * 0.99,
-        sma50: currentPrice * 0.98,
-        sma200: currentPrice * 0.95,
-        rsi: 45 + Math.random() * 20, // Random RSI between 45-65
-        macd: (Math.random() - 0.5) * 2, // Random MACD between -1 and 1
-        signal: (Math.random() - 0.5) * 1.5,
-        histogram: (Math.random() - 0.5) * 0.5,
-        volumeSignal: change > 0 ? 'ABOVE_AVERAGE' : 'NEUTRAL',
-        volumeRatio: 1.1 + Math.random() * 0.4,
-        trend: change > 0 ? 'UPTREND' : 'CONSOLIDATION_UP',
-        trendStrength: change > 0 ? 2 : 1
-      };
-
       return {
         ticker,
         currentPrice,
         previousClose: currentPrice - change,
         change,
         changePercent,
+        sma50: currentPrice * 0.98, // Mock 50-day MA
+        sma200: currentPrice * 0.95, // Mock 200-day MA
         volume: mockData.volume,
-        avgVolume: mockData.volume * 0.8,
-        ...mockTechnical
+        avgVolume: mockData.volume * 0.8
       };
     }
     
@@ -1050,51 +885,28 @@ MARKET IMPACT ANALYSIS, NOT NEWS DESCRIPTION!`
       let priceContext = '';
       let technicalSignal = 'NEUTRAL';
       let priceTargets = { support: null, resistance: null };
-      let technicalInsights = [];
       
       if (priceData) {
-        const { 
-          currentPrice, changePercent, sma20, sma50, sma200, 
-          rsi, macd, signal, histogram, volumeSignal, trend, trendStrength 
-        } = priceData;
+        const { currentPrice, changePercent, sma50, sma200 } = priceData;
         
-        // Comprehensive technical analysis
-        if (sma20 && sma50 && sma200) {
-          technicalSignal = trend === 'STRONG_UPTREND' ? 'STRONGLY_BULLISH' :
-                           trend === 'UPTREND' ? 'BULLISH' :
-                           trend === 'STRONG_DOWNTREND' ? 'STRONGLY_BEARISH' :
-                           trend === 'DOWNTREND' ? 'BEARISH' : 'NEUTRAL';
-          
-          priceContext = `${trend.replace('_', ' ')} at $${currentPrice.toFixed(2)}, ${changePercent.toFixed(2)}% today`;
-          
-          // Add technical insights
-          if (rsi) {
-            if (rsi > 70) technicalInsights.push(`RSI overbought at ${rsi.toFixed(1)} - watch for reversal`);
-            else if (rsi < 30) technicalInsights.push(`RSI oversold at ${rsi.toFixed(1)} - potential bounce opportunity`);
-            else technicalInsights.push(`RSI neutral at ${rsi.toFixed(1)}`);
-          }
-          
-          if (macd && signal) {
-            if (histogram > 0) technicalInsights.push(`MACD bullish above signal line`);
-            else technicalInsights.push(`MACD bearish below signal line`);
-          }
-          
-          if (volumeSignal !== 'NEUTRAL') {
-            technicalInsights.push(`Volume ${volumeSignal.toLowerCase().replace('_', ' ')} confirming price action`);
-          }
-          
-          // Moving average analysis
-          if (currentPrice > sma20 && currentPrice > sma50 && currentPrice > sma200) {
-            technicalInsights.push('Price above all key moving averages - strong bullish structure');
-          } else if (currentPrice < sma20 && currentPrice < sma50 && currentPrice < sma200) {
-            technicalInsights.push('Price below all key moving averages - strong bearish structure');
+        // Technical analysis
+        if (sma50 && sma200) {
+          if (currentPrice > sma50 && sma50 > sma200) {
+            technicalSignal = 'BULLISH';
+            priceContext = `Stock in uptrend (above 50/200-day MAs) at $${currentPrice.toFixed(2)}, up ${changePercent.toFixed(2)}% today`;
+          } else if (currentPrice < sma50 && sma50 < sma200) {
+            technicalSignal = 'BEARISH';
+            priceContext = `Stock in downtrend (below 50/200-day MAs) at $${currentPrice.toFixed(2)}, ${changePercent.toFixed(2)}% today`;
+          } else {
+            technicalSignal = 'NEUTRAL';
+            priceContext = `Stock at $${currentPrice.toFixed(2)}, ${changePercent.toFixed(2)}% today, consolidating around key MAs`;
           }
         }
         
-        // Calculate dynamic price targets based on technical levels
-        if (sma20 && sma50) {
-          priceTargets.support = Math.max(sma20 * 0.98, sma50 * 0.95);
-          priceTargets.resistance = currentPrice * (1 + (0.05 * Math.abs(trendStrength)));
+        // Calculate price targets
+        if (sma50) {
+          priceTargets.support = sma50 * 0.95; // 5% below 50-day MA
+          priceTargets.resistance = currentPrice * 1.10; // 10% above current price
         }
       }
       
@@ -1121,33 +933,19 @@ MARKET IMPACT ANALYSIS, NOT NEWS DESCRIPTION!`
               "Monitor supply chain partners for secondary moves",
               "Check sector ETFs for momentum plays",
               "Watch for short covering rallies"
-            ],
-            technical_insights: technicalInsights
+            ]
           };
           
           // Add technical analysis if price data available
           if (priceData) {
-            baseAnalysis.key_points.unshift(`Technical signal: ${technicalSignal.replace('_', ' ')}`);
+            baseAnalysis.key_points.unshift(`Current technical signal: ${technicalSignal}`);
             if (priceTargets.support && priceTargets.resistance) {
-              baseAnalysis.key_points.push(`Key levels: Support $${priceTargets.support.toFixed(2)}, Resistance $${priceTargets.resistance.toFixed(2)}`);
+              baseAnalysis.key_points.push(`Key levels: Support at $${priceTargets.support.toFixed(2)}, Resistance at $${priceTargets.resistance.toFixed(2)}`);
             }
-            
-            // Enhanced investment thesis based on technicals
-            if (technicalSignal.includes('BULLISH')) {
-              baseAnalysis.investment_thesis = `Buy on dips toward $${priceTargets.support?.toFixed(2)}, target 10-15% upside to $${priceTargets.resistance?.toFixed(2)}`;
-              baseAnalysis.confidence = Math.min(0.95, baseAnalysis.confidence + 0.1);
-            } else if (technicalSignal.includes('BEARISH')) {
-              baseAnalysis.investment_thesis = `Earnings strong but technicals weak - wait for confirmation before buying`;
-              baseAnalysis.confidence = Math.max(0.6, baseAnalysis.confidence - 0.15);
-            }
-            
-            // Add RSI-specific guidance
-            if (priceData.rsi) {
-              if (priceData.rsi > 70) {
-                baseAnalysis.key_points.push("Caution: RSI overbought - consider waiting for pullback");
-              } else if (priceData.rsi < 40) {
-                baseAnalysis.key_points.push("Opportunity: RSI room to run - earnings could fuel rally");
-              }
+            if (technicalSignal === 'BULLISH') {
+              baseAnalysis.investment_thesis = `Buy on any dips toward $${priceTargets.support?.toFixed(2)}, target 10-15% upside to $${priceTargets.resistance?.toFixed(2)}`;
+            } else if (technicalSignal === 'BEARISH') {
+              baseAnalysis.investment_thesis = `Wait for confirmation of trend reversal before buying, current downtrend may limit upside`;
             }
           }
           
@@ -1559,21 +1357,6 @@ MARKET IMPACT ANALYSIS, NOT NEWS DESCRIPTION!`
           );
         }
         
-        // Technical Analysis Display
-        let technicalDisplay = null;
-        if (aiAnalysis.technical_insights && aiAnalysis.technical_insights.length > 0) {
-          technicalDisplay = el('div', { 
-            style:'background: rgba(168,85,247,.08); padding:10px; border-radius:6px; margin:8px 0; border:1px solid rgba(168,85,247,.2);'
-          });
-          
-          technicalDisplay.append(
-            el('div', { style:'font-weight:bold; margin-bottom:6px; color: #a78bfa;' }, '📊 Technical Analysis'),
-            ...aiAnalysis.technical_insights.map(insight => 
-              el('div', { style:'font-size:12px; color: #cbd5e1; margin:2px 0;' }, `• ${insight}`)
-            )
-          );
-        }
-        
         // AI Summary
         const aiSummary = el('div', { className:'summary-text' }, aiAnalysis.summary || cleanText(j.summary ?? j.Summary ?? ''));
         
@@ -1634,7 +1417,6 @@ MARKET IMPACT ANALYSIS, NOT NEWS DESCRIPTION!`
         // Assemble the enhanced summary
         box.append(aiBadge, sumTitle);
         if (priceDisplay) box.append(priceDisplay);
-        if (technicalDisplay) box.append(technicalDisplay);
         box.append(aiSummary);
         if (keyPointsTitle) box.append(keyPointsTitle, keyPoints);
         if (implicationsTitle) box.append(implicationsTitle, implications);
