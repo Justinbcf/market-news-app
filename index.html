@@ -472,7 +472,7 @@
     const el = (t,p={},...c)=>{ const n=Object.assign(document.createElement(t),p); c.filter(x=>x!=null).forEach(x=>n.append(x)); return n; };
     const setStatus = (m)=> $('#status').textContent = m || '';
     const setCount = (n)=> $('#count').textContent = n? `${n} article${n===1?'':'s'}` : '';
-    const isTicker = (q)=> /^[A-Z.\-]{1,7}$/.test(String(q||'').trim());
+    const isTicker = (q)=> /^[A-Z.\-]{1,7}$/i.test(String(q||'').trim());
     const niceTime = (s)=>{ const d=new Date(s); return isNaN(d.getTime())? '' : d.toLocaleString(); };
     const log = (msg, cls='')=> $('#log').append(el('div',{className:cls}, msg));
     const clearLog = ()=> $('#log').innerHTML='';
