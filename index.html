@@ -1251,11 +1251,19 @@ MARKET IMPACT ANALYSIS, NOT NEWS DESCRIPTION!`
         
         // Add price data to analysis if available
         const ticker = extractTicker(it.title, it.description);
+        console.log('Extracted ticker:', ticker);
+        console.log('Title:', it.title);
+        console.log('Description:', it.description);
+        
         if (ticker) {
           const priceData = await getStockPrice(ticker);
+          console.log('Price data fetched:', priceData);
           if (priceData) {
             aiAnalysis.priceData = priceData;
+            console.log('Price data attached to aiAnalysis');
           }
+        } else {
+          console.log('No ticker found in this article');
         }
         
         const aiSentiment = await analyzeSentimentWithAI(it.title);
@@ -1271,7 +1279,10 @@ MARKET IMPACT ANALYSIS, NOT NEWS DESCRIPTION!`
         
         // Real-time Price Display (if available)
         let priceDisplay = null;
+        console.log('Checking for price data in aiAnalysis:', aiAnalysis.priceData);
+        
         if (aiAnalysis.priceData) {
+          console.log('Creating price display...');
           const { currentPrice, change, changePercent, volume, avgVolume } = aiAnalysis.priceData;
           const changeColor = change >= 0 ? '#22c55e' : '#ef4444';
           const changeSymbol = change >= 0 ? '+' : '';
@@ -1289,6 +1300,10 @@ MARKET IMPACT ANALYSIS, NOT NEWS DESCRIPTION!`
               `Volume: ${volume?.toLocaleString() || 'N/A'} | Avg: ${avgVolume?.toLocaleString() || 'N/A'}`
             )
           );
+          
+          console.log('Price display created successfully');
+        } else {
+          console.log('No price data available - price display will not be shown');
         }
         
         // AI Summary
