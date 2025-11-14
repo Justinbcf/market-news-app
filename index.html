@@ -1248,6 +1248,16 @@ MARKET IMPACT ANALYSIS, NOT NEWS DESCRIPTION!`
 
         // Get AI-enhanced analysis
         const aiAnalysis = await getEnhancedAISummary(it.title, it.description, it.url);
+        
+        // Add price data to analysis if available
+        const ticker = extractTicker(it.title, it.description);
+        if (ticker) {
+          const priceData = await getStockPrice(ticker);
+          if (priceData) {
+            aiAnalysis.priceData = priceData;
+          }
+        }
+        
         const aiSentiment = await analyzeSentimentWithAI(it.title);
         const aiCategory = await categorizeNewsWithAI(it.title, it.description);
 
