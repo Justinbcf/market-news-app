@@ -746,7 +746,6 @@ MARKET IMPACT ANALYSIS, NOT NEWS DESCRIPTION!`
     // Extract stock ticker from news content
     function extractTicker(title, description) {
       const text = (title + ' ' + description).toUpperCase();
-      console.log('Extracting ticker from:', text);
       
       // Common stock tickers (prioritized by frequency)
       const commonTickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'JPM', 'JNJ', 'V', 'PG', 'UNH', 'HD', 'MA', 'DIS', 'BAC', 'CSCO', 'XOM', 'VZ', 'CRM', 'NFLX', 'ADBE', 'PYPL', 'INTC', 'CMCSA', 'PEP', 'T', 'COST', 'KO', 'NKE', 'ABT', 'MRK', 'DHR', 'MDT', 'ABBV', 'AVGO', 'TXN', 'HON', 'NEE', 'QCOM', 'UPS', 'LIN', 'LLY', 'LOW', 'AMD', 'TMO', 'SBUX', 'AMGN', 'CAT', 'CVX', 'GE', 'PLD', 'UNP', 'SCHW', 'HCA', 'DE', 'ISRG', 'GILD', 'CB', 'NOW', 'AMAT', 'BA', 'FI', 'DXCM', 'RTX', 'SPGI', 'BKNG', 'EL', 'ICE', 'CL', 'TMUS', 'ADI', 'ZTS', 'CDNS', 'PGR', 'SNPS', 'ORLY', 'REGN', 'MO', 'MDLZ', 'EQIX', 'APH', 'ATVI', 'LMT', 'ADP', 'CSX', 'CTSH', 'MCD', 'CME', 'AON', 'MMC', 'NOC', 'PLTR', 'SO', 'LRCX', 'ROP', 'MCO', 'TFC', 'FDX', 'INTU', 'WM', 'DELL', 'WFC', 'PODD', 'AJG', 'ACN', 'ECL', 'HUM', 'AEP', 'OXY', 'WMT', 'MET', 'USB', 'RSG', 'A', 'MS', 'BLK', 'GS', 'AXP', 'IBM', 'TRV', 'C', 'COF', 'SPG', 'KMI', 'K', 'ALL', 'HAL', 'CVS', 'PFE', 'BMY', 'SYY', 'MRNA', 'TGT', 'AMT', 'DUK', 'BDX', 'EOG', 'MMM', 'PNC', 'SLB', 'ZBH', 'YUM', 'D', 'F', 'GM', 'CI', 'ELV', 'CLX', 'MAA', 'HIG', 'AIG', 'PRU', 'MET', 'TROW', 'VRSK', 'CNI', 'ETN', 'EIX', 'WRK', 'HES', 'AEE', 'WEC', 'O', 'LNT', 'PEG', 'AWK', 'ED', 'DTE', 'XEL', 'WMB', 'ETR', 'FE', 'CNP', 'NRG', 'AES', 'NI'];
@@ -757,7 +756,6 @@ MARKET IMPACT ANALYSIS, NOT NEWS DESCRIPTION!`
         // Use word boundaries to avoid partial matches
         const regex = new RegExp(`\\b${ticker}\\b`, 'i');
         if (regex.test(text)) {
-          console.log('Found ticker:', ticker);
           return ticker;
         }
       }
@@ -765,34 +763,26 @@ MARKET IMPACT ANALYSIS, NOT NEWS DESCRIPTION!`
       // Look for $TICKER pattern
       const tickerMatch = text.match(/\$([A-Z]{1,5})\b/);
       if (tickerMatch) {
-        console.log('Found ticker with $ symbol:', tickerMatch[1]);
         return tickerMatch[1];
       }
       
-      console.log('No ticker found');
       return null;
     }
     
     // Get current stock price and basic data
     async function getStockPrice(ticker) {
       try {
-        console.log('Fetching price for ticker:', ticker);
-        
         // Using a CORS-friendly proxy for Yahoo Finance API
         const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}`)}`;
         const response = await fetch(proxyUrl);
         
         if (!response.ok) {
-          console.log('Yahoo API failed, trying fallback...');
           return getFallbackPriceData(ticker);
         }
         
         const data = await response.json();
-        console.log('Yahoo API response:', data);
-        
         const chart = data.chart?.result?.[0];
         if (!chart) {
-          console.log('No chart data, using fallback...');
           return getFallbackPriceData(ticker);
         }
         
@@ -800,47 +790,29 @@ MARKET IMPACT ANALYSIS, NOT NEWS DESCRIPTION!`
         const previousClose = chart.meta?.previousClose;
         
         if (!currentPrice || !previousClose) {
-          console.log('Missing price data, using fallback...');
           return getFallbackPriceData(ticker);
         }
         
         const change = currentPrice - previousClose;
         const changePercent = (change / previousClose) * 100;
         
-        // Get 50-day and 200-day moving averages if available
-        const indicators = chart.indicators;
-        const quote = indicators?.quote?.[0];
-        const prices = quote?.close?.filter(p => p !== null) || [];
-        
-        const sma50 = prices.length >= 50 ? prices.slice(-50).reduce((a, b) => a + b) / 50 : null;
-        const sma200 = prices.length >= 200 ? prices.slice(-200).reduce((a, b) => a + b) / 200 : null;
-        
-        const result = {
+        return {
           ticker,
           currentPrice,
           previousClose,
           change,
           changePercent,
-          sma50,
-          sma200,
           volume: chart.meta?.regularMarketVolume,
           avgVolume: chart.meta?.averageDailyVolume3Month
         };
         
-        console.log('Price data fetched successfully:', result);
-        return result;
-        
       } catch (error) {
-        console.error('Price fetch failed:', error);
         return getFallbackPriceData(ticker);
       }
     }
     
-        
     // Fallback price data for demonstration (mock data)
     function getFallbackPriceData(ticker) {
-      console.log('Using fallback price data for:', ticker);
-      
       // Mock price data for major tickers
       const mockPrices = {
         'AAPL': { price: 178.45, change: 2.34, volume: 52000000 },
@@ -870,8 +842,6 @@ MARKET IMPACT ANALYSIS, NOT NEWS DESCRIPTION!`
         previousClose: currentPrice - change,
         change,
         changePercent,
-        sma50: currentPrice * 0.98, // Mock 50-day MA
-        sma200: currentPrice * 0.95, // Mock 200-day MA
         volume: mockData.volume,
         avgVolume: mockData.volume * 0.8
       };
@@ -881,40 +851,18 @@ MARKET IMPACT ANALYSIS, NOT NEWS DESCRIPTION!`
     function analyzeMarketNews(title, description, ticker = null, priceData = null) {
       const text = (title + ' ' + description).toLowerCase();
       
-      // Add price context to analysis
+      // Add price context if available
       let priceContext = '';
-      let technicalSignal = 'NEUTRAL';
-      let priceTargets = { support: null, resistance: null };
-      
       if (priceData) {
-        const { currentPrice, changePercent, sma50, sma200 } = priceData;
-        
-        // Technical analysis
-        if (sma50 && sma200) {
-          if (currentPrice > sma50 && sma50 > sma200) {
-            technicalSignal = 'BULLISH';
-            priceContext = `Stock in uptrend (above 50/200-day MAs) at $${currentPrice.toFixed(2)}, up ${changePercent.toFixed(2)}% today`;
-          } else if (currentPrice < sma50 && sma50 < sma200) {
-            technicalSignal = 'BEARISH';
-            priceContext = `Stock in downtrend (below 50/200-day MAs) at $${currentPrice.toFixed(2)}, ${changePercent.toFixed(2)}% today`;
-          } else {
-            technicalSignal = 'NEUTRAL';
-            priceContext = `Stock at $${currentPrice.toFixed(2)}, ${changePercent.toFixed(2)}% today, consolidating around key MAs`;
-          }
-        }
-        
-        // Calculate price targets
-        if (sma50) {
-          priceTargets.support = sma50 * 0.95; // 5% below 50-day MA
-          priceTargets.resistance = currentPrice * 1.10; // 10% above current price
-        }
+        const { currentPrice, changePercent } = priceData;
+        priceContext = `Current price $${currentPrice.toFixed(2)}, ${changePercent.toFixed(2)}% today. `;
       }
       
       // Earnings analysis
       if (text.includes('earnings') || text.includes('eps') || text.includes('quarterly')) {
         if (text.includes('beat') || text.includes('exceed') || text.includes('top') || text.includes('better than')) {
-          const baseAnalysis = {
-            summary: `Earnings beat signals strong fundamentals. ${priceContext || ''} Expect institutional buying and upward price momentum. Consider buying positions with 3-6 month horizon.`,
+          return {
+            summary: `${priceContext}Earnings beat signals strong fundamentals - expect institutional buying and upward price momentum. Consider buying positions with 3-6 month horizon.`,
             key_points: [
               "Institutional accumulation likely over next 2 weeks",
               "Watch for analyst upgrades and price target increases",
@@ -935,21 +883,6 @@ MARKET IMPACT ANALYSIS, NOT NEWS DESCRIPTION!`
               "Watch for short covering rallies"
             ]
           };
-          
-          // Add technical analysis if price data available
-          if (priceData) {
-            baseAnalysis.key_points.unshift(`Current technical signal: ${technicalSignal}`);
-            if (priceTargets.support && priceTargets.resistance) {
-              baseAnalysis.key_points.push(`Key levels: Support at $${priceTargets.support.toFixed(2)}, Resistance at $${priceTargets.resistance.toFixed(2)}`);
-            }
-            if (technicalSignal === 'BULLISH') {
-              baseAnalysis.investment_thesis = `Buy on any dips toward $${priceTargets.support?.toFixed(2)}, target 10-15% upside to $${priceTargets.resistance?.toFixed(2)}`;
-            } else if (technicalSignal === 'BEARISH') {
-              baseAnalysis.investment_thesis = `Wait for confirmation of trend reversal before buying, current downtrend may limit upside`;
-            }
-          }
-          
-          return baseAnalysis;
         } else if (text.includes('miss') || text.includes('below') || text.includes('fell short') || text.includes('disappoint')) {
           return {
             summary: "Earnings miss indicates fundamental weakness - expect institutional selling and support level testing. Consider reducing exposure or waiting for better entry.",
@@ -1315,15 +1248,6 @@ MARKET IMPACT ANALYSIS, NOT NEWS DESCRIPTION!`
 
         // Get AI-enhanced analysis
         const aiAnalysis = await getEnhancedAISummary(it.title, it.description, it.url);
-        
-        // Add price data to analysis if available
-        const ticker = extractTicker(it.title, it.description);
-        if (ticker) {
-          const priceData = await getStockPrice(ticker);
-          if (priceData) {
-            aiAnalysis.priceData = priceData;
-          }
-        }
         const aiSentiment = await analyzeSentimentWithAI(it.title);
         const aiCategory = await categorizeNewsWithAI(it.title, it.description);
 
